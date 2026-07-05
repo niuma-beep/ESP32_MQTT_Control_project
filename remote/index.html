@@ -1,0 +1,935 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ESP32 &#x8fdc;&#x7a0b;&#x8bbe;&#x5907;&#x7ba1;&#x7406;</title>
+  <meta name="theme-color" content="#0f766e">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --nav: #111827;
+      --panel: #ffffff;
+      --soft: #f7fafc;
+      --line: #d7e1ea;
+      --text: #111827;
+      --muted: #667085;
+      --brand: #0f766e;
+      --brand-dark: #115e59;
+      --green: #15803d;
+      --red: #b91c1c;
+      --amber: #b45309;
+      --blue: #2563eb;
+      --shadow: 0 10px 26px rgba(17,24,39,.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
+    }
+    button, input { font: inherit; }
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+    }
+    .sidebar {
+      background: var(--nav);
+      color: #e5edf5;
+      padding: 16px;
+      display: grid;
+      grid-template-rows: auto auto minmax(0,1fr);
+      gap: 14px;
+      min-height: 100vh;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+    .brand-mark {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: var(--brand);
+      color: #fff;
+      font-weight: 800;
+    }
+    .brand-title { font-weight: 800; line-height: 1.2; }
+    .brand-sub { color: #a8b5c3; font-size: 12px; margin-top: 2px; }
+    .title-row, .section-title, .label-row, .btn-content {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title {
+      font-weight: 800;
+    }
+    .icon {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      flex: 0 0 auto;
+    }
+    .icon.sm {
+      width: 16px;
+      height: 16px;
+    }
+    .label-row .icon,
+    .section-title .icon {
+      color: var(--brand);
+    }
+    .side-box {
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+      display: grid;
+      gap: 10px;
+    }
+    .field label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    .sidebar .field label { color: #a8b5c3; }
+    input {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text);
+      padding: 0 10px;
+    }
+    .sidebar input {
+      background: rgba(255,255,255,.08);
+      border-color: rgba(255,255,255,.14);
+      color: #fff;
+    }
+    .btn {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 12px;
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .btn.primary:hover { background: var(--brand-dark); }
+    .btn.danger { color: var(--red); }
+    .btn.block { width: 100%; }
+    .btn.small { min-height: 32px; padding: 0 10px; font-size: 13px; }
+    .devices {
+      display: grid;
+      gap: 8px;
+      overflow: auto;
+      align-content: start;
+    }
+    .device-btn {
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 8px;
+      background: rgba(255,255,255,.05);
+      color: #dce7f2;
+      padding: 10px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .device-btn.active {
+      background: rgba(15,118,110,.28);
+      border-color: rgba(45,212,191,.42);
+      color: #fff;
+    }
+    .device-name {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-weight: 700;
+    }
+    .device-meta {
+      margin-top: 6px;
+      color: #a8b5c3;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--amber);
+      display: inline-block;
+      flex: 0 0 auto;
+    }
+    .dot.ok { background: var(--green); }
+    .dot.bad { background: var(--red); }
+    .dot.wait { background: var(--amber); }
+    .main {
+      min-width: 0;
+      padding: 16px;
+    }
+    .hero, .panel, .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+    h1, h2, h3 { margin: 0; letter-spacing: 0; }
+    h1 { font-size: 22px; }
+    h2 { font-size: 17px; }
+    h3 { font-size: 14px; }
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .status-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .region {
+      margin-top: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .region-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 0 4px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .card {
+      min-height: 112px;
+      padding: 14px;
+    }
+    .label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+    .value {
+      font-size: 26px;
+      line-height: 1.12;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+    .value.small { font-size: 18px; }
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      margin-top: 8px;
+      overflow-wrap: anywhere;
+    }
+    .panel { overflow: hidden; }
+    .panel-head {
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfdff;
+    }
+    .panel-body {
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 12px;
+      align-items: start;
+    }
+    .stack { display: grid; gap: 12px; }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .topic {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      background: var(--soft);
+      border: 1px solid #e3ebf2;
+      border-radius: 8px;
+      padding: 8px 10px;
+      overflow-wrap: anywhere;
+    }
+    .rgb {
+      display: grid;
+      grid-template-columns: 88px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+    }
+    .swatch {
+      width: 88px;
+      height: 88px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #000;
+    }
+    input[type="color"] {
+      height: 42px;
+      padding: 3px;
+    }
+    .presets {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .preset {
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .log {
+      height: 260px;
+      overflow: auto;
+      padding: 10px 12px;
+      background: #fbfdff;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .log div {
+      padding: 5px 0;
+      border-bottom: 1px solid #edf2f7;
+      overflow-wrap: anywhere;
+    }
+    .empty {
+      padding: 20px 12px;
+      border: 1px dashed rgba(255,255,255,.16);
+      border-radius: 8px;
+      color: #a8b5c3;
+      background: rgba(255,255,255,.04);
+      text-align: center;
+      font-size: 13px;
+    }
+    @media (max-width: 1180px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { min-height: auto; }
+      .devices { max-height: 260px; }
+      .layout { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 680px) {
+      .main { padding: 10px; }
+      .hero, .region-head { align-items: flex-start; flex-direction: column; }
+      .grid, .grid.two, .form-grid { grid-template-columns: 1fr; }
+      .rgb { grid-template-columns: 1fr; }
+      .swatch { width: 100%; }
+      .btn { width: 100%; }
+      .value { font-size: 23px; }
+    }
+  </style>
+</head>
+<body>
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="icon-home" viewBox="0 0 24 24">
+      <path d="M3 11 12 3l9 8"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path>
+    </symbol>
+    <symbol id="icon-plug" viewBox="0 0 24 24">
+      <path d="M8 2v6M16 2v6M7 8h10v4a5 5 0 0 1-10 0Z"></path><path d="M12 17v5"></path>
+    </symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24">
+      <path d="M12 5v14M5 12h14"></path>
+    </symbol>
+    <symbol id="icon-device" viewBox="0 0 24 24">
+      <rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M9 7h6M10 17h4"></path>
+    </symbol>
+    <symbol id="icon-cloud" viewBox="0 0 24 24">
+      <path d="M17.5 18H8a5 5 0 1 1 .7-9.95A6 6 0 0 1 20 11a3.5 3.5 0 0 1-2.5 7Z"></path>
+    </symbol>
+    <symbol id="icon-wifi" viewBox="0 0 24 24">
+      <path d="M4 9a12 12 0 0 1 16 0"></path><path d="M7 12.5a7.5 7.5 0 0 1 10 0"></path><path d="M10 16a3 3 0 0 1 4 0"></path><path d="M12 20h.01"></path>
+    </symbol>
+    <symbol id="icon-sensor" viewBox="0 0 24 24">
+      <path d="M14 14.76V5a4 4 0 0 0-8 0v9.76a6 6 0 1 0 8 0Z"></path><path d="M10 7v7"></path>
+    </symbol>
+    <symbol id="icon-memory" viewBox="0 0 24 24">
+      <rect x="5" y="5" width="14" height="14" rx="2"></rect><path d="M9 9h6v6H9zM9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"></path>
+    </symbol>
+    <symbol id="icon-data" viewBox="0 0 24 24">
+      <path d="M4 19V5"></path><path d="M4 19h16"></path><path d="m7 15 4-4 3 3 5-7"></path>
+    </symbol>
+    <symbol id="icon-control" viewBox="0 0 24 24">
+      <path d="M4 21v-7"></path><path d="M4 10V3"></path><path d="M12 21v-9"></path><path d="M12 8V3"></path><path d="M20 21v-5"></path><path d="M20 12V3"></path><path d="M2 14h4"></path><path d="M10 8h4"></path><path d="M18 16h4"></path>
+    </symbol>
+    <symbol id="icon-topic" viewBox="0 0 24 24">
+      <path d="M4 7h8a4 4 0 0 1 0 8H4"></path><path d="M20 17h-8a4 4 0 0 1 0-8h8"></path><path d="M8 12h8"></path>
+    </symbol>
+    <symbol id="icon-log" viewBox="0 0 24 24">
+      <path d="M5 4h14v16H5z"></path><path d="M8 8h8M8 12h8M8 16h5"></path>
+    </symbol>
+    <symbol id="icon-color" viewBox="0 0 24 24">
+      <path d="M12 22a8 8 0 0 0 8-8c0-5-8-12-8-12S4 9 4 14a8 8 0 0 0 8 8Z"></path>
+    </symbol>
+    <symbol id="icon-command" viewBox="0 0 24 24">
+      <path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"></path>
+    </symbol>
+  </svg>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">IoT</div>
+        <div>
+          <div class="brand-title">ESP32 &#x8bbe;&#x5907;&#x4e2d;&#x5fc3;</div>
+          <div class="brand-sub">&#x4e91;&#x7aef; MQTT &#x8fdc;&#x7a0b;&#x7ba1;&#x7406;</div>
+        </div>
+      </div>
+
+      <section class="side-box">
+        <h3 class="section-title"><svg class="icon sm"><use href="#icon-plug"></use></svg>&#x8fde;&#x63a5;&#x914d;&#x7f6e;</h3>
+        <div class="muted">&#x9875;&#x9762;&#x6253;&#x5f00;&#x540e;&#x4f1a;&#x81ea;&#x52a8;&#x8fde;&#x63a5;&#x4e91;&#x7aef; MQTT&#xff0c;&#x7528;&#x6237;&#x4e0d;&#x9700;&#x8981;&#x9009;&#x62e9;&#x670d;&#x52a1;&#x5668;&#x3002;</div>
+        <div id="brokerText" class="device-meta">--</div>
+        <button id="connectBtn" class="btn primary block" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-cloud"></use></svg>&#x91cd;&#x65b0;&#x8fde;&#x63a5;</span></button>
+        <button id="disconnectBtn" class="btn block" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-plug"></use></svg>&#x65ad;&#x5f00;&#x8fde;&#x63a5;</span></button>
+      </section>
+
+      <section class="side-box">
+        <h3 class="section-title"><svg class="icon sm"><use href="#icon-plus"></use></svg>&#x6dfb;&#x52a0;&#x8bbe;&#x5907;</h3>
+        <div class="field">
+          <label for="deviceNameInput">&#x8bbe;&#x5907;&#x540d;&#x79f0;</label>
+          <input id="deviceNameInput" placeholder="&#x5367;&#x5ba4;&#x4f20;&#x611f;&#x5668;">
+        </div>
+        <div class="field">
+          <label for="deviceIdInput">&#x8bbe;&#x5907; ID</label>
+          <input id="deviceIdInput" placeholder="esp32s3-34B7DA12ABCD">
+        </div>
+        <button id="addDeviceBtn" class="btn primary block" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-plus"></use></svg>&#x6dfb;&#x52a0;&#x8bbe;&#x5907;</span></button>
+      </section>
+
+      <section class="devices" id="deviceList"></section>
+    </aside>
+
+    <main class="main">
+      <header class="hero">
+        <div>
+          <h1 class="section-title"><svg class="icon"><use href="#icon-home"></use></svg>&#x8fdc;&#x7a0b;&#x8bbe;&#x5907;&#x7ba1;&#x7406;</h1>
+          <div class="status-line">
+            <span id="mqttDot" class="dot bad"></span>
+            <span id="mqttText">MQTT --</span>
+            <span id="deviceText">&#x8bbe;&#x5907; --</span>
+            <span id="lastSeenText">&#x6700;&#x8fd1;&#x6d88;&#x606f; --</span>
+          </div>
+        </div>
+        <div class="status-line">
+          <button id="resubBtn" class="btn" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-topic"></use></svg>&#x91cd;&#x65b0;&#x8ba2;&#x9605;</span></button>
+          <button id="removeDeviceBtn" class="btn danger" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-device"></use></svg>&#x5220;&#x9664;&#x8bbe;&#x5907;</span></button>
+        </div>
+      </header>
+
+      <section class="region">
+        <div class="region-head">
+          <h2 class="section-title"><svg class="icon"><use href="#icon-device"></use></svg>&#x8bbe;&#x5907;&#x6982;&#x89c8;</h2>
+          <div id="selectedTopic" class="muted">--</div>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <div class="label label-row"><svg class="icon sm"><use href="#icon-cloud"></use></svg>MQTT &#x8fde;&#x63a5;</div>
+            <div id="mqttState" class="value small">--</div>
+            <div class="meta">&#x4e91;&#x7aef;&#x8fde;&#x63a5;</div>
+          </article>
+          <article class="card">
+            <div class="label label-row"><svg class="icon sm"><use href="#icon-wifi"></use></svg>&#x8def;&#x7531;&#x5668; Wi-Fi</div>
+            <div id="wifiState" class="value small">--</div>
+            <div id="wifiMeta" class="meta">--</div>
+          </article>
+          <article class="card">
+            <div class="label label-row"><svg class="icon sm"><use href="#icon-sensor"></use></svg>&#x4f20;&#x611f;&#x5668;</div>
+            <div id="sensorState" class="value small">--</div>
+            <div id="sensorMeta" class="meta">--</div>
+          </article>
+          <article class="card">
+            <div class="label label-row"><svg class="icon sm"><use href="#icon-memory"></use></svg>&#x8bbe;&#x5907;&#x8d44;&#x6e90;</div>
+            <div id="heapValue" class="value small">--</div>
+            <div id="uptimeValue" class="meta">--</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="region layout">
+        <div class="stack">
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="section-title"><svg class="icon"><use href="#icon-data"></use></svg>&#x73af;&#x5883;&#x6570;&#x636e;</h2>
+              <span id="telemetryTopic" class="muted">--</span>
+            </div>
+            <div class="panel-body">
+              <div class="grid">
+                <article class="card">
+                  <div class="label label-row"><svg class="icon sm"><use href="#icon-sensor"></use></svg>&#x5ba4;&#x5185;&#x6e29;&#x5ea6;</div>
+                  <div id="sensorTemp" class="value">--</div>
+                  <div id="sensorAge" class="meta">--</div>
+                </article>
+                <article class="card">
+                  <div class="label label-row"><svg class="icon sm"><use href="#icon-sensor"></use></svg>&#x5ba4;&#x5185;&#x6e7f;&#x5ea6;</div>
+                  <div id="sensorHum" class="value">--</div>
+                  <div class="meta">AHT30</div>
+                </article>
+                <article class="card">
+                  <div class="label label-row"><svg class="icon sm"><use href="#icon-cloud"></use></svg>&#x5ba4;&#x5916;&#x5929;&#x6c14;</div>
+                  <div id="weatherDesc" class="value small">--</div>
+                  <div id="weatherMeta" class="meta">--</div>
+                </article>
+                <article class="card">
+                  <div class="label label-row"><svg class="icon sm"><use href="#icon-home"></use></svg>&#x57ce;&#x5e02;</div>
+                  <div id="cityValue" class="value small">--</div>
+                  <div id="weatherTime" class="meta">--</div>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="section-title"><svg class="icon"><use href="#icon-control"></use></svg>&#x8bbe;&#x5907;&#x63a7;&#x5236;</h2>
+              <span id="rgbText" class="muted">#000000</span>
+            </div>
+            <div class="panel-body">
+              <div class="grid two">
+                <article class="card">
+                  <h3 class="section-title"><svg class="icon sm"><use href="#icon-color"></use></svg>RGB &#x6c1b;&#x56f4;&#x706f;</h3>
+                  <div class="rgb" style="margin-top:12px">
+                    <div id="swatch" class="swatch"></div>
+                    <div class="stack">
+                      <input id="colorInput" type="color" value="#000000">
+                      <div class="presets">
+                        <button class="preset" data-color="#ff0000" style="background:#ff0000" type="button"></button>
+                        <button class="preset" data-color="#00ff00" style="background:#00ff00" type="button"></button>
+                        <button class="preset" data-color="#0000ff" style="background:#0000ff" type="button"></button>
+                        <button class="preset" data-color="#ffffff" style="background:#ffffff" type="button"></button>
+                        <button class="preset" data-color="#ffaa3c" style="background:#ffaa3c" type="button"></button>
+                        <button class="preset" data-color="#00ffff" style="background:#00ffff" type="button"></button>
+                        <button class="preset" data-color="#ff00ff" style="background:#ff00ff" type="button"></button>
+                        <button class="preset" data-color="#000000" style="background:#000000" type="button"></button>
+                      </div>
+                      <button id="sendColorBtn" class="btn primary block" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-color"></use></svg>&#x53d1;&#x9001; RGB</span></button>
+                    </div>
+                  </div>
+                </article>
+                <article class="card">
+                  <h3 class="section-title"><svg class="icon sm"><use href="#icon-command"></use></svg>&#x6269;&#x5c55;&#x547d;&#x4ee4;</h3>
+                  <div class="form-grid" style="margin-top:12px">
+                    <div class="field">
+                      <label for="customKey">&#x952e;</label>
+                      <input id="customKey" value="mode">
+                    </div>
+                    <div class="field">
+                      <label for="customValue">&#x503c;</label>
+                      <input id="customValue" value="auto">
+                    </div>
+                  </div>
+                  <button id="sendCustomBtn" class="btn block" type="button" style="margin-top:12px"><span class="btn-content"><svg class="icon sm"><use href="#icon-command"></use></svg>&#x53d1;&#x9001;&#x6269;&#x5c55;&#x547d;&#x4ee4;</span></button>
+                </article>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="stack">
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="section-title"><svg class="icon"><use href="#icon-topic"></use></svg>&#x4e3b;&#x9898;&#x6620;&#x5c04;</h2>
+            </div>
+            <div class="panel-body">
+              <div id="topicSub" class="topic">--</div>
+              <div id="topicRgb" class="topic">--</div>
+              <div id="topicStatus" class="topic">--</div>
+            </div>
+          </section>
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="section-title"><svg class="icon"><use href="#icon-log"></use></svg>&#x4e8b;&#x4ef6;&#x65e5;&#x5fd7;</h2>
+              <button id="clearLogBtn" class="btn small" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-log"></use></svg>&#x6e05;&#x7a7a;</span></button>
+            </div>
+            <div id="log" class="log"></div>
+          </section>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script>
+    const STORAGE_KEY = "esp32_mqtt_devices_v2";
+    const SELECTED_KEY = "esp32_selected_device";
+    const TOPIC_PREFIX = "iot/v1/devices";
+    const DEFAULT_BROKER = "wss://broker.emqx.io:8084/mqtt";
+    const T = {
+      noDevice: "\u672a\u9009\u62e9\u8bbe\u5907",
+      noDevices: "\u6682\u65e0\u8bbe\u5907\uff0c\u8bf7\u5728\u4e0a\u65b9\u6dfb\u52a0\u8bbe\u5907 ID",
+      mqttDisconnected: "MQTT \u672a\u8fde\u63a5",
+      mqttConnecting: "MQTT \u8fde\u63a5\u4e2d",
+      mqttConnected: "MQTT \u5df2\u8fde\u63a5",
+      mqttReconnect: "MQTT \u91cd\u8fde\u4e2d",
+      deviceOnline: "\u8bbe\u5907\u5728\u7ebf",
+      deviceOffline: "\u8bbe\u5907\u79bb\u7ebf",
+      deviceWaiting: "\u8bbe\u5907\u7b49\u5f85",
+      added: "\u5df2\u6dfb\u52a0\u8bbe\u5907 ",
+      removed: "\u5df2\u5220\u9664\u8bbe\u5907 ",
+      emptyId: "\u6dfb\u52a0\u5931\u8d25\uff1a\u8bbe\u5907 ID \u4e3a\u7a7a",
+      notSentNoDevice: "\u672a\u53d1\u9001\uff1a\u672a\u9009\u62e9\u8bbe\u5907",
+      notSentOffline: "\u672a\u53d1\u9001\uff1aMQTT \u672a\u8fde\u63a5",
+      subscribe: "\u8ba2\u9605 ",
+      subscribeFail: "\u8ba2\u9605\u5931\u8d25 ",
+      nonJson: "\u975e JSON \u6d88\u606f",
+      last: "\u6700\u8fd1\u6d88\u606f ",
+      synced: " \u5df2\u540c\u6b65",
+      pending: " \u5f85\u53d1\u9001"
+    };
+
+    const els = Object.fromEntries(Array.from(document.querySelectorAll("[id]")).map(el => [el.id, el]));
+    let client = null;
+    let devices = loadDevices();
+    let selectedId = localStorage.getItem(SELECTED_KEY) || (devices[0] && devices[0].device_id) || "";
+    let stateByDevice = {};
+    let currentColor = "#000000";
+
+    function loadDevices() {
+      try {
+        const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        return Array.isArray(data) ? data : [];
+      } catch (err) {
+        return [];
+      }
+    }
+    function saveDevices() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(devices));
+      if (selectedId) localStorage.setItem(SELECTED_KEY, selectedId);
+    }
+    function normalizeDeviceId(value) {
+      return (value || "").trim().replace(/\s+/g, "");
+    }
+    function baseTopic(deviceId) {
+      return TOPIC_PREFIX + "/" + deviceId;
+    }
+    function topic(deviceId, suffix) {
+      return baseTopic(deviceId) + suffix;
+    }
+    function selectedDevice() {
+      return devices.find(d => d.device_id === selectedId) || null;
+    }
+    function escapeHtml(text) {
+      return String(text || "").replace(/[&<>"']/g, ch => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[ch]));
+    }
+    function log(line) {
+      const item = document.createElement("div");
+      item.textContent = new Date().toLocaleTimeString("zh-CN", { hour12: false }) + "  " + line;
+      els.log.prepend(item);
+      while (els.log.children.length > 120) els.log.lastChild.remove();
+    }
+    function setDot(el, status) {
+      el.className = "dot " + status;
+    }
+    function setMqttState(status, text) {
+      setDot(els.mqttDot, status);
+      els.mqttText.textContent = text;
+      els.mqttState.textContent = text.replace("MQTT ", "");
+    }
+    function fmtAge(ms) {
+      if (!Number.isFinite(ms) || ms < 0) return "--";
+      if (ms < 1000) return "\u521a\u521a";
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return s + "\u79d2\u524d";
+      const m = Math.floor(s / 60);
+      if (m < 60) return m + "\u5206\u949f\u524d";
+      return Math.floor(m / 60) + "\u5c0f\u65f6\u524d";
+    }
+    function fmtUptime(ms) {
+      if (!Number.isFinite(ms)) return "--";
+      const s = Math.floor(ms / 1000);
+      return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m " + (s % 60) + "s";
+    }
+    function hexToRgb(hex) {
+      const v = hex.replace("#", "");
+      return { r: parseInt(v.slice(0, 2), 16), g: parseInt(v.slice(2, 4), 16), b: parseInt(v.slice(4, 6), 16) };
+    }
+    function rgbToHex(r, g, b) {
+      return "#" + [r, g, b].map(v => Math.max(0, Math.min(255, Number(v) || 0)).toString(16).padStart(2, "0")).join("");
+    }
+    function setColor(hex, fromDevice) {
+      currentColor = hex.toLowerCase();
+      els.colorInput.value = currentColor;
+      els.swatch.style.background = currentColor;
+      els.rgbText.textContent = currentColor.toUpperCase() + (fromDevice ? T.synced : T.pending);
+    }
+    function renderDeviceList() {
+      els.deviceList.innerHTML = "";
+      if (!devices.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = T.noDevices;
+        els.deviceList.appendChild(empty);
+        return;
+      }
+      devices.forEach(device => {
+        const snap = stateByDevice[device.device_id] || {};
+        const online = snap.online === true ? "ok" : snap.online === false ? "bad" : "wait";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "device-btn" + (device.device_id === selectedId ? " active" : "");
+        button.innerHTML =
+          '<div class="device-name"><span>' + escapeHtml(device.name || device.device_id) + '</span><i class="dot ' + online + '"></i></div>' +
+          '<div class="device-meta">' + escapeHtml(device.device_id) + '</div>';
+        button.addEventListener("click", () => {
+          selectedId = device.device_id;
+          saveDevices();
+          subscribeAll();
+          render();
+        });
+        els.deviceList.appendChild(button);
+      });
+    }
+    function render() {
+      const device = selectedDevice();
+      renderDeviceList();
+      if (!device) {
+        els.deviceText.textContent = T.noDevice;
+        els.lastSeenText.textContent = "\u6700\u8fd1\u6d88\u606f --";
+        els.selectedTopic.textContent = "--";
+        els.telemetryTopic.textContent = "--";
+        updateTelemetry({});
+        updateTopics("");
+        return;
+      }
+      const snap = stateByDevice[device.device_id] || {};
+      els.deviceText.textContent = snap.online === true ? T.deviceOnline : snap.online === false ? T.deviceOffline : T.deviceWaiting;
+      els.lastSeenText.textContent = snap.last_seen ? T.last + fmtAge(Date.now() - snap.last_seen) : "\u6700\u8fd1\u6d88\u606f --";
+      els.selectedTopic.textContent = baseTopic(device.device_id);
+      els.telemetryTopic.textContent = topic(device.device_id, "/telemetry");
+      updateTopics(device.device_id);
+      updateTelemetry(snap.telemetry || {});
+      if (snap.rgb) setColor(rgbToHex(snap.rgb.r, snap.rgb.g, snap.rgb.b), true);
+    }
+    function updateTopics(deviceId) {
+      if (!deviceId) {
+        els.topicSub.textContent = "--";
+        els.topicRgb.textContent = "--";
+        els.topicStatus.textContent = "--";
+        return;
+      }
+      els.topicSub.textContent = "\u8ba2\u9605: " + topic(deviceId, "/#");
+      els.topicRgb.textContent = "RGB \u63a7\u5236: " + topic(deviceId, "/cmd/rgb") + " / " + topic(deviceId, "/state/rgb");
+      els.topicStatus.textContent = "\u72b6\u6001: " + topic(deviceId, "/status");
+    }
+    function updateTelemetry(data) {
+      const sensorOk = !!data.sensor_ok;
+      els.sensorTemp.textContent = sensorOk && Number.isFinite(Number(data.sensor_temp)) ? Number(data.sensor_temp).toFixed(1) + " C" : "--";
+      els.sensorHum.textContent = sensorOk && Number.isFinite(Number(data.sensor_humidity)) ? Number(data.sensor_humidity).toFixed(1) + " %" : "--";
+      els.sensorAge.textContent = data.sensor_age != null ? "\u66f4\u65b0 " + fmtAge(Number(data.sensor_age)) : "--";
+      els.sensorState.textContent = sensorOk ? "\u6b63\u5e38" : "\u7b49\u5f85";
+      els.sensorMeta.textContent = sensorOk ? "AHT30" : "\u7b49\u5f85\u4f20\u611f\u5668";
+      els.wifiState.textContent = data.sta_connected ? "\u5df2\u8fde\u63a5" : data.sta_connected === false ? "\u79bb\u7ebf" : "--";
+      els.wifiMeta.textContent = data.sta_ip ? data.sta_ip + " / " + data.wifi_rssi + " dBm" : "--";
+      els.heapValue.textContent = Number.isFinite(Number(data.free_heap)) ? Math.round(Number(data.free_heap) / 1024) + " KB" : "--";
+      els.uptimeValue.textContent = data.uptime != null ? "\u8fd0\u884c " + fmtUptime(Number(data.uptime)) : "--";
+      els.weatherDesc.textContent = data.weather_desc || "--";
+      els.weatherMeta.textContent = data.weather_temp ? data.weather_temp + " C / " + (data.weather_humidity || "--") + " %" : "--";
+      els.cityValue.textContent = data.city || "--";
+      els.weatherTime.textContent = data.weather_time || "--";
+    }
+    function connectMqtt() {
+      if (!window.mqtt) {
+        setMqttState("bad", "MQTT.js \u672a\u52a0\u8f7d");
+        log("MQTT.js \u52a0\u8f7d\u5931\u8d25");
+        return;
+      }
+      if (client) client.end(true);
+      const broker = DEFAULT_BROKER;
+      setMqttState("wait", T.mqttConnecting);
+      log("\u8fde\u63a5 " + broker);
+      client = mqtt.connect(broker, {
+        clientId: "web_" + Math.random().toString(16).slice(2),
+        clean: true,
+        reconnectPeriod: 2000,
+        connectTimeout: 8000,
+        keepalive: 60
+      });
+      client.on("connect", () => {
+        setMqttState("ok", T.mqttConnected);
+        log(T.mqttConnected);
+        subscribeAll();
+      });
+      client.on("reconnect", () => setMqttState("wait", T.mqttReconnect));
+      client.on("close", () => setMqttState("bad", T.mqttDisconnected));
+      client.on("error", err => log("MQTT \u9519\u8bef " + err.message));
+      client.on("message", handleMessage);
+    }
+    function disconnectMqtt() {
+      if (client) client.end(true);
+      setMqttState("bad", T.mqttDisconnected);
+      log(T.mqttDisconnected);
+    }
+    function subscribeAll() {
+      if (!client || !client.connected) return;
+      devices.forEach(device => {
+        const sub = topic(device.device_id, "/#");
+        client.subscribe(sub, { qos: 0 }, err => log(err ? T.subscribeFail + sub : T.subscribe + sub));
+      });
+    }
+    function handleMessage(rawTopic, payloadBuffer) {
+      const matched = devices.find(device => rawTopic.startsWith(baseTopic(device.device_id) + "/"));
+      if (!matched) return;
+      const payload = payloadBuffer.toString();
+      const snap = stateByDevice[matched.device_id] || {};
+      snap.last_seen = Date.now();
+      let data = null;
+      try {
+        data = JSON.parse(payload);
+      } catch (err) {
+        log(rawTopic + " " + T.nonJson);
+        return;
+      }
+      if (rawTopic.endsWith("/telemetry")) {
+        snap.telemetry = data;
+        if (typeof data.sta_connected === "boolean") snap.online = data.sta_connected;
+        if (Number.isFinite(data.rgb_r) && Number.isFinite(data.rgb_g) && Number.isFinite(data.rgb_b)) {
+          snap.rgb = { r: data.rgb_r, g: data.rgb_g, b: data.rgb_b };
+        }
+      } else if (rawTopic.endsWith("/status")) {
+        snap.online = !!data.online;
+        log((matched.name || matched.device_id) + (snap.online ? " " + T.deviceOnline : " " + T.deviceOffline));
+      } else if (rawTopic.endsWith("/state/rgb")) {
+        if (Number.isFinite(data.r) && Number.isFinite(data.g) && Number.isFinite(data.b)) {
+          snap.rgb = { r: data.r, g: data.g, b: data.b };
+        }
+      } else if (rawTopic.endsWith("/ack")) {
+        log("\u6267\u884c\u56de\u6267 " + payload);
+      }
+      stateByDevice[matched.device_id] = snap;
+      render();
+    }
+    function publishJson(suffix, payload, label) {
+      const device = selectedDevice();
+      if (!device) {
+        log(label + " " + T.notSentNoDevice);
+        return;
+      }
+      if (!client || !client.connected) {
+        log(label + " " + T.notSentOffline);
+        return;
+      }
+      const target = topic(device.device_id, suffix);
+      const body = JSON.stringify({ request_id: "web-" + Date.now(), ...payload });
+      client.publish(target, body, { qos: 1, retain: false }, err => {
+        log(err ? label + " \u53d1\u9001\u5931\u8d25" : label + " -> " + target + " " + body);
+      });
+    }
+    function publishColor(hex) {
+      const rgb = hexToRgb(hex);
+      publishJson("/cmd/rgb", { r: rgb.r, g: rgb.g, b: rgb.b, hex }, "RGB");
+    }
+    function addDevice() {
+      const deviceId = normalizeDeviceId(els.deviceIdInput.value);
+      if (!deviceId) {
+        log(T.emptyId);
+        return;
+      }
+      if (devices.some(d => d.device_id === deviceId)) {
+        selectedId = deviceId;
+        saveDevices();
+        render();
+        return;
+      }
+      devices.push({ name: els.deviceNameInput.value.trim() || deviceId, device_id: deviceId });
+      selectedId = deviceId;
+      els.deviceNameInput.value = "";
+      els.deviceIdInput.value = "";
+      saveDevices();
+      subscribeAll();
+      render();
+      log(T.added + deviceId);
+    }
+    function removeDevice() {
+      const device = selectedDevice();
+      if (!device) return;
+      devices = devices.filter(d => d.device_id !== device.device_id);
+      delete stateByDevice[device.device_id];
+      selectedId = (devices[0] && devices[0].device_id) || "";
+      saveDevices();
+      render();
+      log(T.removed + device.device_id);
+    }
+
+    els.connectBtn.addEventListener("click", connectMqtt);
+    els.disconnectBtn.addEventListener("click", disconnectMqtt);
+    els.resubBtn.addEventListener("click", subscribeAll);
+    els.addDeviceBtn.addEventListener("click", addDevice);
+    els.removeDeviceBtn.addEventListener("click", removeDevice);
+    els.clearLogBtn.addEventListener("click", () => { els.log.innerHTML = ""; });
+    els.colorInput.addEventListener("input", evt => setColor(evt.target.value, false));
+    els.sendColorBtn.addEventListener("click", () => publishColor(currentColor));
+    els.sendCustomBtn.addEventListener("click", () => {
+      const key = els.customKey.value.trim() || "key";
+      publishJson("/cmd/custom", { [key]: els.customValue.value.trim() }, "\u6269\u5c55\u547d\u4ee4");
+    });
+    document.querySelectorAll(".preset").forEach(btn => {
+      btn.addEventListener("click", () => {
+        setColor(btn.dataset.color, false);
+        publishColor(btn.dataset.color);
+      });
+    });
+
+    els.brokerText.textContent = DEFAULT_BROKER;
+    setMqttState("bad", T.mqttDisconnected);
+    render();
+    setColor(currentColor, false);
+    connectMqtt();
+
+    if ("serviceWorker" in navigator && location.protocol === "https:") {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(err => log("PWA \u6ce8\u518c\u5931\u8d25 " + err.message));
+      });
+    }
+  </script>
+</body>
+</html>

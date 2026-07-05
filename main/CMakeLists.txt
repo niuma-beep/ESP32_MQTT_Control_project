@@ -1,0 +1,32 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "app_state.c"
+        "app_time.c"
+        "i2c_bus.c"
+        "rgb_led.c"
+        "aht30_sensor.c"
+        "oled_ui.c"
+        "weather_client.c"
+        "web_server.c"
+        "wifi_portal.c"
+        "dns_server.c"
+        "mqtt_client_app.c"
+    INCLUDE_DIRS "."
+    EMBED_TXTFILES "index.html"
+    PRIV_REQUIRES
+        esp_driver_rmt
+        esp_driver_i2c
+        esp_lcd
+        esp_wifi
+        esp_event
+        esp_netif
+        nvs_flash
+        esp_http_server
+        esp_http_client
+        esp-tls
+        esp_timer
+        mqtt
+        lwip
+        json
+)
