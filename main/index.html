@@ -31,6 +31,7 @@
     }
 
     button { font: inherit; }
+    input { font: inherit; }
 
     main {
       width: min(960px, 100%);
@@ -250,6 +251,138 @@
     }
     .btn.secondary:hover { border-color: #9aa8b8; background: #fff; }
 
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .field input {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 10px;
+      color: var(--text);
+      background: #fff;
+    }
+
+    .field input:focus {
+      outline: 2px solid rgba(15,118,110,.18);
+      border-color: var(--brand);
+    }
+
+    .password-wrap {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 38px;
+    }
+
+    .password-wrap input {
+      min-width: 0;
+      border-radius: 8px 0 0 8px;
+      border-right: 0;
+    }
+
+    .password-toggle {
+      width: 38px;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 0 8px 8px 0;
+      background: #fff;
+      color: var(--muted);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+
+    .password-toggle:hover {
+      color: var(--brand);
+      border-color: var(--brand);
+    }
+
+    .network-list {
+      display: grid;
+      gap: 8px;
+      max-height: 260px;
+      overflow: auto;
+    }
+
+    .network-row {
+      width: 100%;
+      min-height: 48px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      background: var(--soft);
+      color: var(--text);
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr) minmax(92px, auto);
+      align-items: center;
+      gap: 10px;
+      text-align: left;
+      overflow: hidden;
+    }
+
+    .network-row:hover {
+      border-color: var(--brand);
+      background: #f0fdfa;
+    }
+
+    .network-name {
+      font-weight: 800;
+      min-width: 0;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .network-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      text-align: right;
+    }
+
+    .signal-icon {
+      width: 22px;
+      height: 18px;
+      display: inline-flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 2px;
+      color: var(--brand);
+    }
+
+    .signal-icon .bar {
+      width: 4px;
+      border-radius: 3px 3px 1px 1px;
+      background: #cbd5e1;
+    }
+
+    .signal-icon .bar:nth-child(1) { height: 5px; }
+    .signal-icon .bar:nth-child(2) { height: 9px; }
+    .signal-icon .bar:nth-child(3) { height: 13px; }
+    .signal-icon .bar:nth-child(4) { height: 17px; }
+    .signal-icon.level-1 .bar:nth-child(1),
+    .signal-icon.level-2 .bar:nth-child(-n+2),
+    .signal-icon.level-3 .bar:nth-child(-n+3),
+    .signal-icon.level-4 .bar:nth-child(-n+4) {
+      background: currentColor;
+    }
+
     .steps {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -302,9 +435,11 @@
     @media (max-width: 760px) {
       main { padding: 12px 10px 22px; }
       .hero-top, .section-head { align-items: flex-start; flex-direction: column; }
-      .grid, .grid.three, .steps { grid-template-columns: 1fr; }
+      .grid, .grid.three, .steps, .form-grid { grid-template-columns: 1fr; }
       .value { font-size: 20px; }
       .btn { width: 100%; }
+      .network-row { grid-template-columns: 24px minmax(0, 1fr); }
+      .network-meta { grid-column: 2; text-align: left; }
     }
   </style>
 </head>
@@ -348,6 +483,16 @@
     <symbol id="icon-copy" viewBox="0 0 24 24">
       <rect x="8" y="8" width="12" height="12" rx="2"></rect>
       <path d="M4 16V6a2 2 0 0 1 2-2h10"></path>
+    </symbol>
+    <symbol id="icon-eye" viewBox="0 0 24 24">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
+      <circle cx="12" cy="12" r="3"></circle>
+    </symbol>
+    <symbol id="icon-eye-off" viewBox="0 0 24 24">
+      <path d="m3 3 18 18"></path>
+      <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"></path>
+      <path d="M9.5 5.3A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a17.4 17.4 0 0 1-2.1 3.1"></path>
+      <path d="M6.6 6.6C3.6 8.6 2 12 2 12s3.5 7 10 7a9.8 9.8 0 0 0 4.1-.9"></path>
     </symbol>
     <symbol id="icon-debug" viewBox="0 0 24 24">
       <path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"></path>
@@ -419,6 +564,37 @@
     </section>
 
     <section class="section">
+      <div class="panel">
+        <div class="panel-head">
+          <h2 class="section-title"><svg class="icon"><use href="#icon-wifi"></use></svg>Wi-Fi &#x914d;&#x7f51;</h2>
+          <button id="scanWifiBtn" class="btn secondary" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-refresh"></use></svg>&#x626b;&#x63cf;&#x7f51;&#x7edc;</span></button>
+        </div>
+        <div class="panel-body">
+          <div id="wifiConfigStatus" class="muted">&#x70b9;&#x51fb;&#x626b;&#x63cf;&#x7f51;&#x7edc;&#xff0c;&#x9009;&#x62e9;&#x8def;&#x7531;&#x5668;&#x5e76;&#x8f93;&#x5165;&#x5bc6;&#x7801;&#x3002;</div>
+          <div id="networkList" class="network-list">
+            <div class="muted">&#x6682;&#x65e0;&#x626b;&#x63cf;&#x7ed3;&#x679c;</div>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="wifiSsid">Wi-Fi SSID</label>
+              <input id="wifiSsid" type="text" maxlength="32" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="wifiPassword">&#x5bc6;&#x7801;</label>
+              <div class="password-wrap">
+                <input id="wifiPassword" type="password" maxlength="63" autocomplete="off">
+                <button id="togglePasswordBtn" class="password-toggle" type="button" aria-label="&#x663e;&#x793a;&#x5bc6;&#x7801;" title="&#x663e;&#x793a;&#x5bc6;&#x7801;"><svg class="icon sm"><use id="togglePasswordIcon" href="#icon-eye"></use></svg></button>
+              </div>
+            </div>
+          </div>
+          <div class="actions">
+            <button id="connectWifiBtn" class="btn" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-wifi"></use></svg>&#x8fde;&#x63a5;&#x8def;&#x7531;&#x5668;</span></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
       <div class="section-head">
         <h2 class="section-title"><svg class="icon"><use href="#icon-wifi"></use></svg>&#x8fd0;&#x884c;&#x72b6;&#x6001;</h2>
         <button id="refreshBtn" class="btn secondary" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-refresh"></use></svg>&#x5237;&#x65b0;</span></button>
@@ -479,7 +655,18 @@
       noIp: "\u6682\u65e0 STA IP",
       updated: "\u66f4\u65b0 ",
       uptime: "\u8fd0\u884c\u65f6\u95f4 ",
-      freeHeap: "\u53ef\u7528\u5185\u5b58 "
+      freeHeap: "\u53ef\u7528\u5185\u5b58 ",
+      scanning: "\u6b63\u5728\u626b\u63cf Wi-Fi...",
+      scanOk: "\u626b\u63cf\u5b8c\u6210\uff0c\u8bf7\u9009\u62e9\u4e00\u4e2a\u7f51\u7edc\u3002",
+      scanFail: "\u626b\u63cf\u5931\u8d25: ",
+      noNetworks: "\u672a\u627e\u5230 Wi-Fi \u4fe1\u53f7",
+      hiddenNetwork: "\u9690\u85cf\u7f51\u7edc",
+      connectMissing: "\u8bf7\u5148\u586b\u5199 Wi-Fi SSID",
+      connecting: "\u5df2\u4fdd\u5b58\u914d\u7f6e\uff0c\u6b63\u5728\u8fde\u63a5\u8def\u7531\u5668...",
+      connectOk: "\u8fde\u63a5\u8bf7\u6c42\u5df2\u53d1\u9001",
+      connectFail: "\u8fde\u63a5\u5931\u8d25: ",
+      showPassword: "\u663e\u793a\u5bc6\u7801",
+      hidePassword: "\u9690\u85cf\u5bc6\u7801"
     };
 
     const els = Object.fromEntries(Array.from(document.querySelectorAll("[id]")).map(el => [el.id, el]));
@@ -517,8 +704,11 @@
       els.deviceId.textContent = deviceId;
       els.baseTopic.textContent = baseTopic;
 
-      els.wifiState.textContent = latest.sta_connected ? T.connected : T.disconnected;
-      els.wifiMeta.textContent = latest.sta_ip ? latest.sta_ip + " / " + latest.wifi_rssi + " dBm" : T.noIp;
+      const staSsid = latest.sta_ssid || "";
+      els.wifiState.textContent = latest.sta_connected ? (staSsid || T.connected) : T.disconnected;
+      els.wifiMeta.textContent = latest.sta_connected
+        ? T.connected + " / " + (latest.sta_ip || T.noIp) + " / " + latest.wifi_rssi + " dBm"
+        : T.noIp;
 
       els.sensorState.textContent = latest.sensor_ok ? T.sensorOk : T.waiting;
       els.sensorMeta.textContent = latest.sensor_ok
@@ -537,6 +727,7 @@
         device_id: latest.device_id,
         mqtt_base_topic: latest.mqtt_base_topic,
         sta_connected: latest.sta_connected,
+        sta_ssid: latest.sta_ssid,
         sta_ip: latest.sta_ip,
         wifi_rssi: latest.wifi_rssi,
         sensor_ok: latest.sensor_ok,
@@ -548,21 +739,137 @@
       }, null, 2);
     }
 
+    async function postJson(path, body) {
+      const res = await fetch(path, {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {})
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    }
+
     async function loadData() {
       try {
         els.mainStatus.textContent = T.loading;
-        const res = await fetch("/api/data", {
-          method: "POST",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: "{}"
-        });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const data = await res.json();
+        const data = await postJson("/api/data", {});
         render(data);
         setStatus(true, T.ok);
       } catch (err) {
         setStatus(false, T.fail + err.message);
+      }
+    }
+
+    function setWifiConfigStatus(text, bad) {
+      els.wifiConfigStatus.textContent = text;
+      els.wifiConfigStatus.style.color = bad ? "var(--red)" : "var(--muted)";
+    }
+
+    function rssiLevel(rssi) {
+      const value = Number(rssi);
+      if (!Number.isFinite(value)) return 1;
+      if (value >= -55) return 4;
+      if (value >= -67) return 3;
+      if (value >= -78) return 2;
+      return 1;
+    }
+
+    function createSignalIcon(rssi) {
+      const icon = document.createElement("span");
+      icon.className = "signal-icon level-" + rssiLevel(rssi);
+      icon.setAttribute("aria-hidden", "true");
+      for (let i = 0; i < 4; i++) {
+        const bar = document.createElement("span");
+        bar.className = "bar";
+        icon.appendChild(bar);
+      }
+      return icon;
+    }
+
+    function renderNetworks(networks) {
+      els.networkList.textContent = "";
+      const list = Array.isArray(networks) ? networks.slice() : [];
+      list.sort((a, b) => Number(b.rssi) - Number(a.rssi));
+      if (!list.length) {
+        const empty = document.createElement("div");
+        empty.className = "muted";
+        empty.textContent = T.noNetworks;
+        els.networkList.appendChild(empty);
+        return;
+      }
+
+      list.forEach(net => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "network-row";
+
+        const signal = createSignalIcon(net.rssi);
+
+        const name = document.createElement("div");
+        name.className = "network-name";
+        name.textContent = net.ssid || T.hiddenNetwork;
+
+        const meta = document.createElement("div");
+        meta.className = "network-meta";
+        meta.textContent = Number(net.rssi) + " dBm / CH " + net.channel + " / " + net.auth;
+
+        row.appendChild(signal);
+        row.appendChild(name);
+        row.appendChild(meta);
+        row.addEventListener("click", () => {
+          els.wifiSsid.value = net.ssid || "";
+          setWifiConfigStatus(net.ssid ? T.scanOk : T.hiddenNetwork, false);
+          els.wifiPassword.focus();
+        });
+        els.networkList.appendChild(row);
+      });
+    }
+
+    async function scanWifi() {
+      els.scanWifiBtn.disabled = true;
+      setWifiConfigStatus(T.scanning, false);
+      try {
+        const data = await postJson("/api/wifi/scan", {});
+        renderNetworks(data.networks);
+        setWifiConfigStatus(T.scanOk, false);
+      } catch (err) {
+        setWifiConfigStatus(T.scanFail + err.message, true);
+      } finally {
+        els.scanWifiBtn.disabled = false;
+      }
+    }
+
+    function togglePasswordVisible() {
+      const show = els.wifiPassword.type === "password";
+      els.wifiPassword.type = show ? "text" : "password";
+      els.togglePasswordIcon.setAttribute("href", show ? "#icon-eye-off" : "#icon-eye");
+      els.togglePasswordBtn.setAttribute("aria-label", show ? T.hidePassword : T.showPassword);
+      els.togglePasswordBtn.setAttribute("title", show ? T.hidePassword : T.showPassword);
+      els.wifiPassword.focus();
+    }
+
+    async function connectWifi() {
+      const ssid = els.wifiSsid.value.trim();
+      if (!ssid) {
+        setWifiConfigStatus(T.connectMissing, true);
+        return;
+      }
+
+      els.connectWifiBtn.disabled = true;
+      setWifiConfigStatus(T.connecting, false);
+      try {
+        await postJson("/api/wifi/connect", {
+          ssid,
+          password: els.wifiPassword.value
+        });
+        setWifiConfigStatus(T.connectOk, false);
+        setTimeout(loadData, 2500);
+        setTimeout(loadData, 6000);
+      } catch (err) {
+        setWifiConfigStatus(T.connectFail + err.message, true);
+      } finally {
+        els.connectWifiBtn.disabled = false;
       }
     }
 
@@ -577,6 +884,9 @@
     }
 
     els.refreshBtn.addEventListener("click", loadData);
+    els.scanWifiBtn.addEventListener("click", scanWifi);
+    els.connectWifiBtn.addEventListener("click", connectWifi);
+    els.togglePasswordBtn.addEventListener("click", togglePasswordVisible);
     els.copyIdBtn.addEventListener("click", () => copyText((latest && latest.device_id) || ""));
     els.copyTopicBtn.addEventListener("click", () => copyText((latest && latest.mqtt_base_topic) || ""));
 

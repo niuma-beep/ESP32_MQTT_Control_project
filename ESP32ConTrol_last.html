@@ -1,0 +1,846 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark" data-mode="user">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>ESP32 远程设备管理</title>
+  <meta name="theme-color" content="#0d1117">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="ESP32 管理">
+  <meta name="apple-touch-icon" href="icon-192.png">
+  <style>
+    /* 🎨 统一色彩变量管理系统 */
+    :root[data-theme="dark"] {
+      --bg: #090d16;
+      --bg-gradient: linear-gradient(135deg, #070a13 0%, #110f24 100%);
+      --nav: rgba(13, 17, 23, 0.75);
+      --panel: rgba(22, 28, 45, 0.45);
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --soft: rgba(0, 0, 0, 0.3);
+      --line: rgba(255, 255, 255, 0.08);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --brand: #6366f1;
+      --brand-dark: #4f46e5;
+      --brand-glow: rgba(99, 102, 241, 0.35);
+      --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    }
+
+    :root[data-theme="light"] {
+      --bg: #f1f5f9;
+      --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      --nav: rgba(255, 255, 255, 0.75);
+      --panel: rgba(255, 255, 255, 0.4);
+      --glass-bg: rgba(0, 0, 0, 0.02);
+      --glass-border: rgba(0, 0, 0, 0.06);
+      --soft: rgba(255, 255, 255, 0.6);
+      --line: rgba(0, 0, 0, 0.06);
+      --text: #0f172a;
+      --muted: #64748b;
+      --brand: #4f46e5;
+      --brand-dark: #3730a3;
+      --brand-glow: rgba(79, 70, 229, 0.2);
+      --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.06);
+    }
+
+    :root {
+      --green: #10b981;
+      --red: #ef4444;
+      --amber: #f59e0b;
+      --radius: 16px;
+    }
+
+    * { 
+      box-sizing: border-box; 
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      transition: background-color 0.3s ease, border-color 0.3s ease; 
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg-gradient);
+      background-attachment: fixed;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;
+    }
+
+    button, input, select { font: inherit; outline: none; }
+
+    .app { min-height: 100vh; width: 100%; display: flex; align-items: stretch; }
+
+    /* 侧边栏及高级磨砂卡片系统 */
+    .sidebar {
+      width: 280px;
+      flex: 0 0 280px;
+      background: var(--nav);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-right: 1px solid var(--glass-border);
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand-meta { display: flex; align-items: center; gap: 12px; }
+
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--brand) 0%, #4338ca 100%);
+      color: #fff;
+      font-weight: 800;
+      box-shadow: 0 4px 12px var(--brand-glow);
+    }
+    .brand-title { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.5px; }
+    .brand-sub { color: var(--muted); font-size: 11px; margin-top: 3px; }
+
+    /* 🌓 顶栏控制按钮 */
+    .theme-toggle-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      color: var(--text);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition: transform 0.2s, background-color 0.2s;
+    }
+    .theme-toggle-btn:active { transform: scale(0.9); }
+    .theme-toggle-btn:hover { background: rgba(99, 102, 241, 0.08); border-color: var(--brand); }
+
+    :root[data-theme="dark"] .icon-sun { display: none; }
+    :root[data-theme="light"] .icon-moon { display: none; }
+
+    /* ⚙️ 模式图标状态切换 */
+    :root[data-mode="user"] .icon-dev { display: none; }
+    :root[data-mode="developer"] .icon-usr { display: none; }
+
+    .side-nav { display: flex; flex-direction: column; gap: 8px; }
+    
+    .nav-btn {
+      min-height: 46px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.01);
+      color: var(--text);
+      opacity: 0.8;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 14px;
+      text-align: left;
+    }
+    .nav-btn:active { transform: scale(0.98); }
+    .nav-btn.active {
+      background: rgba(99, 102, 241, 0.12);
+      border-color: rgba(99, 102, 241, 0.3);
+      opacity: 1;
+      font-weight: 600;
+    }
+
+    .field label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; text-transform: uppercase; }
+    
+    input {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.15);
+      color: var(--text);
+      padding: 0 14px;
+      font-size: 16px;
+    }
+    :root[data-theme="light"] input { background: rgba(255, 255, 255, 0.6); }
+    input:focus { border-color: var(--brand); box-shadow: 0 0 10px var(--brand-glow); }
+    input:disabled, button:disabled { opacity: 0.5; cursor: not-allowed !important; }
+
+    .btn {
+      min-height: 44px;
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      padding: 0 16px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+    .btn:active:not(:disabled) { transform: scale(0.97); }
+    .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: 0 4px 14px var(--brand-glow); }
+    .btn.danger { color: var(--red); border-color: rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.06); }
+    .btn.block { width: 100%; }
+    .btn.small { min-height: 32px; padding: 0 10px; font-size: 13px; border-radius: 6px; }
+
+    /* 内容展现层 */
+    .main { flex: 1 1 auto; width: 100%; min-width: 0; padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+    .hero, .panel, .card { background: var(--panel); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .hero { padding: 20px; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+    .status-line { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; color: var(--muted); font-size: 13px; }
+
+    .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+    .dot.ok { background: var(--green); box-shadow: 0 0 10px var(--green); }
+    .dot.bad { background: var(--red); box-shadow: 0 0 10px var(--red); }
+    .dot.wait { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+
+    .region { width: 100%; display: grid; gap: 14px; }
+    .region-head { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; }
+    .device-overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+
+    .device-card-btn {
+      min-height: 130px; border: 1px solid var(--glass-border); border-radius: var(--radius); background: rgba(255, 255, 255, 0.01); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      color: var(--text); padding: 16px; text-align: left; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; box-shadow: var(--shadow);
+    }
+    .device-card-btn:active { transform: scale(0.97); }
+    .device-card-btn:hover { border-color: rgba(99, 102, 241, 0.4); background: rgba(99, 102, 241, 0.03); }
+    .device-card-icon { width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; background: rgba(99, 102, 241, 0.1); color: var(--brand); border: 1px solid rgba(99, 102, 241, 0.15); }
+    .device-card-title { font-weight: 600; font-size: 1rem; overflow-wrap: anywhere; }
+    .device-card-status { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .card { padding: 18px; min-height: 110px; display: flex; flex-direction: column; justify-content: space-between; }
+    .card.offline-lock { opacity: 0.65; position: relative; }
+    .label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    .value { font-size: 1.6rem; font-weight: 700; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .value.small { font-size: 1.15rem; }
+    .meta { color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+    .panel { overflow: hidden; display: flex; flex-direction: column; }
+    .panel-head { min-height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--line); background: rgba(0, 0, 0, 0.05); }
+    .panel-body { padding: 18px; display: grid; gap: 16px; }
+    .layout { display: grid; grid-template-columns: 1fr 340px; gap: 16px; align-items: start; }
+    .stack { display: flex; flex-direction: column; gap: 16px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    /* RGB控制 */
+    .rgb { display: grid; grid-template-columns: 94px 1fr; gap: 16px; align-items: center; }
+    .swatch { width: 94px; height: 94px; border-radius: 14px; border: 2px solid var(--glass-border); background: #000; box-shadow: 0 4px 14px rgba(0,0,0,0.2); }
+    input[type="color"] { height: 46px; padding: 4px; cursor: pointer; }
+    .presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .preset { min-height: 38px; border: 1px solid var(--glass-border); border-radius: 8px; cursor: pointer; }
+    .preset:active:not(:disabled) { transform: scale(0.9); }
+
+    .topic { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: var(--muted); }
+    .log { height: 240px; overflow-y: auto; padding: 12px; background: rgba(0, 0, 0, 0.1); border-radius: 10px; border: 1px solid var(--line); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.6; color: var(--brand); }
+    :root[data-theme="dark"] .log { color: #38bdf8; background: rgba(0,0,0,0.25); }
+    .log div { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03); overflow-wrap: anywhere; }
+
+    .title-row, .section-title, .label-row, .btn-content { display: inline-flex; align-items: center; gap: 8px; }
+    .section-title { font-weight: 600; font-size: 1.1rem; }
+    .icon { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; flex: 0 0 auto; }
+    .icon.sm { width: 16px; height: 16px; }
+    .label-row .icon, .section-title .icon { color: var(--brand); }
+
+    .view[hidden], [data-panel][hidden] { display: none !important; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .empty-hint { text-align: center; color: var(--muted); padding: 20px 0; font-size: 14px; grid-column: 1 / -1; }
+
+    /* 🛠️ 界面显隐及布局过滤机制 (核心优化) */
+    :root[data-mode="user"] [data-panel="topics"],
+    :root[data-mode="user"] [data-panel="logs"],
+    :root[data-mode="user"] .developer-only {
+      display: none !important;
+    }
+    /* 用户纯净模式下，主控面板横向拉伸100%全款自适应平铺 */
+    :root[data-mode="user"] .layout {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* 📱 手机端适配响应层 */
+    @media (max-width: 960px) {
+      .app { flex-direction: column; }
+      .sidebar { width: 100%; flex: 0 0 auto; padding: calc(12px + env(safe-area-inset-top)) 16px 12px 16px; border-right: none; border-bottom: 1px solid var(--glass-border); }
+      .brand { padding-bottom: 12px; }
+      .side-nav { flex-direction: row; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .nav-btn { min-height: 40px; justify-content: center; font-size: 13px; padding: 0 4px; gap: 6px; }
+      .main { padding: 14px; gap: 14px; }
+      .hero { flex-direction: column; align-items: stretch; gap: 12px; }
+      .hero .status-line { justify-content: space-between; }
+      .layout { grid-template-columns: 1fr !important; }
+    }
+
+    @media (max-width: 540px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .rgb { grid-template-columns: 1fr; }
+      .swatch { width: 100%; height: 50px; }
+      .grid { grid-template-columns: 1fr; }
+      .value { font-size: 1.35rem; }
+    }
+  </style>
+</head>
+<body>
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="icon-sun" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+    </symbol>
+    <symbol id="icon-moon" viewBox="0 0 24 24">
+      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+    </symbol>
+    <symbol id="icon-home" viewBox="0 0 24 24">
+      <path d="M3 11 12 3l9 8"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path>
+    </symbol>
+    <symbol id="icon-plug" viewBox="0 0 24 24">
+      <path d="M8 2v6M16 2v6M7 8h10v4a5 5 0 0 1-10 0Z"></path><path d="M12 17v5"></path>
+    </symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24">
+      <path d="M12 5v14M5 12h14"></path>
+    </symbol>
+    <symbol id="icon-device" viewBox="0 0 24 24">
+      <rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M9 7h6M10 17h4"></path>
+    </symbol>
+    <symbol id="icon-cloud" viewBox="0 0 24 24">
+      <path d="M17.5 18H8a5 5 0 1 1 .7-9.95A6 6 0 0 1 20 11a3.5 3.5 0 0 1-2.5 7Z"></path>
+    </symbol>
+    <symbol id="icon-wifi" viewBox="0 0 24 24">
+      <path d="M4 9a12 12 0 0 1 16 0"></path><path d="M7 12.5a7.5 7.5 0 0 1 10 0"></path><path d="M10 16a3 3 0 0 1 4 0"></path><path d="M12 20h.01"></path>
+    </symbol>
+    <symbol id="icon-sensor" viewBox="0 0 24 24">
+      <path d="M14 14.76V5a4 4 0 0 0-8 0v9.76a6 6 0 1 0 8 0Z"></path><path d="M10 7v7"></path>
+    </symbol>
+    <symbol id="icon-memory" viewBox="0 0 24 24">
+      <rect x="5" y="5" width="14" height="14" rx="2"></rect><path d="M9 9h6v6H9zM9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"></path>
+    </symbol>
+    <symbol id="icon-data" viewBox="0 0 24 24">
+      <path d="M4 19V5"></path><path d="M4 19h16"></path><path d="m7 15 4-4 3 3 5-7"></path>
+    </symbol>
+    <symbol id="icon-control" viewBox="0 0 24 24">
+      <path d="M4 21v-7"></path><path d="M4 10V3"></path><path d="M12 21v-9"></path><path d="M12 8V3"></path><path d="M20 21v-5"></path><path d="M20 12V3"></path><path d="M2 14h4"></path><path d="M10 8h4"></path><path d="M18 16h4"></path>
+    </symbol>
+    <symbol id="icon-topic" viewBox="0 0 24 24">
+      <path d="M4 7h8a4 4 0 0 1 0 8H4"></path><path d="M20 17h-8a4 4 0 0 1 0-8h8"></path><path d="M8 12h8"></path>
+    </symbol>
+    <symbol id="icon-log" viewBox="0 0 24 24">
+      <path d="M5 4h14v16H5z"></path><path d="M8 8h8M8 12h8M8 16h5"></path>
+    </symbol>
+    <symbol id="icon-color" viewBox="0 0 24 24">
+      <path d="M12 22a8 8 0 0 0 8-8c0-5-8-12-8-12S4 9 4 14a8 8 0 0 0 8 8Z"></path>
+    </symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+    </symbol>
+    <symbol id="icon-user" viewBox="0 0 24 24">
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>
+    </symbol>
+    <symbol id="icon-terminal" viewBox="0 0 24 24">
+      <polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line>
+    </symbol>
+  </svg>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-meta">
+          <div class="brand-mark">IoT</div>
+          <div>
+            <div class="brand-title">ESP32 中心</div>
+            <div class="brand-sub">MQTT 智能控制</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button id="toggleModeBtn" class="theme-toggle-btn" type="button" title="切换用户/开发调试模式">
+            <svg class="icon icon-dev" style="width:18px;height:18px;"><use href="#icon-terminal"></use></svg>
+            <svg class="icon icon-usr" style="width:18px;height:18px;"><use href="#icon-user"></use></svg>
+          </button>
+          <button id="toggleThemeBtn" class="theme-toggle-btn" type="button" title="切换明暗主题">
+            <svg class="icon icon-sun"><use href="#icon-sun"></use></svg>
+            <svg class="icon icon-moon"><use href="#icon-moon"></use></svg>
+          </button>
+        </div>
+      </div>
+
+      <nav id="sideNav" class="side-nav">
+        <button class="nav-btn" type="button" data-view="connection"><svg class="icon sm"><use href="#icon-plug"></use></svg>连接配置</button>
+        <button class="nav-btn active" type="button" data-view="devices"><svg class="icon sm"><use href="#icon-device"></use></svg>我的设备</button>
+        <button class="nav-btn" type="button" data-view="add"><svg class="icon sm"><use href="#icon-plus"></use></svg>添加设备</button>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <header id="mainHeader" class="hero" hidden>
+        <div>
+          <h1 class="section-title"><svg class="icon"><use href="#icon-home"></use></svg>控制面板</h1>
+          <div class="status-line">
+            <span id="mqttDot" class="dot bad"></span>
+            <span id="mqttText">MQTT --</span>
+            <span id="deviceText">设备 --</span>
+            <span id="lastSeenText">最近消息 --</span>
+          </div>
+        </div>
+        <div class="status-line">
+          <button id="backToListBtn" class="btn" type="button" hidden><span class="btn-content"><svg class="icon sm"><use href="#icon-device"></use></svg>返回列表</span></button>
+          <button id="resubBtn" class="btn developer-only" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-topic"></use></svg>重新订阅</span></button>
+          <button id="removeDeviceBtn" class="btn danger" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-device"></use></svg>删除设备</span></button>
+        </div>
+      </header>
+
+      <section id="connectionView" class="region view" hidden>
+        <div class="region-head"><h2 class="section-title"><svg class="icon"><use href="#icon-plug"></use></svg>连接配置</h2></div>
+        <article class="card style-card" style="max-width: 520px;">
+          <div class="label label-row"><svg class="icon sm"><use href="#icon-cloud"></use></svg>MQTT 服务器状态</div>
+          <div id="connectionStateText" class="value small">--</div>
+          <div id="brokerText" class="meta">--</div>
+          <div class="grid" style="margin-top:14px; grid-template-columns: 1fr 1fr;">
+            <button id="connectBtn" class="btn primary" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-cloud"></use></svg>连接</span></button>
+            <button id="disconnectBtn" class="btn" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-plug"></use></svg>断开</span></button>
+          </div>
+        </article>
+      </section>
+
+      <section id="deviceListView" class="region view">
+        <div class="region-head">
+          <h2 class="section-title"><svg class="icon"><use href="#icon-device"></use></svg>设备列表 (MAC)</h2>
+          <div id="deviceCountText" class="muted">--</div>
+        </div>
+        <div id="mainDeviceGrid" class="device-overview-grid"></div>
+      </section>
+
+      <section id="addDeviceView" class="region view" hidden>
+        <div class="region-head"><h2 class="section-title"><svg class="icon"><use href="#icon-plus"></use></svg>添加硬件设备</h2></div>
+        <article class="card style-card" style="max-width: 520px;">
+          <div class="form-grid">
+            <div class="field"><label for="deviceNameInput">自定义别名</label><input id="deviceNameInput" placeholder="例如：客厅桌面像素钟"></div>
+            <div class="field"><label for="deviceIdInput">设备唯一ID (建议填写MAC地址)</label><input id="deviceIdInput" placeholder="例如：34B7DA12ABCD"></div>
+          </div>
+          <button id="addDeviceBtn" class="btn primary" type="button" style="margin-top:14px"><span class="btn-content"><svg class="icon sm"><use href="#icon-plus"></use></svg>确认保存设备</span></button>
+        </article>
+      </section>
+
+      <div id="deviceDetailView" class="view" hidden>
+        <section class="region">
+          <div class="region-head">
+            <h2 class="section-title"><svg class="icon"><use href="#icon-device"></use></svg>物理照护指标</h2>
+            <div id="selectedTopic" class="muted developer-only">--</div>
+          </div>
+          <div class="grid">
+            <article class="card"><div class="label label-row"><svg class="icon sm"><use href="#icon-cloud"></use></svg>MQTT 信道</div><div id="mqttState" class="value small">--</div><div class="meta">云端连接</div></article>
+            <article class="card"><div class="label label-row"><svg class="icon sm"><use href="#icon-wifi"></use></svg>本地无线 RSSI</div><div id="wifiState" class="value small">--</div><div id="wifiMeta" class="meta">--</div></article>
+            <article class="card developer-only"><div class="label label-row"><svg class="icon sm"><use href="#icon-sensor"></use></svg>外设就绪状态</div><div id="sensorState" class="value small">--</div><div id="sensorMeta" class="meta">--</div></article>
+            <article class="card developer-only"><div class="label label-row"><svg class="icon sm"><use href="#icon-memory"></use></svg>芯片物理内存</div><div id="heapValue" class="value small">--</div><div id="uptimeValue" class="meta">--</div></article>
+          </div>
+        </section>
+
+        <section class="region layout" style="margin-top: 14px;">
+          <div class="stack">
+            <section class="panel" data-panel="environment">
+              <div class="panel-head"><h2 class="section-title"><svg class="icon"><use href="#icon-data"></use></svg>环境遥测面板</h2><span id="telemetryTopic" class="muted developer-only">--</span></div>
+              <div class="panel-body">
+                <div class="grid">
+                  <article class="card"><div class="label label-row"><svg class="icon sm"><use href="#icon-sensor"></use></svg>环境温度</div><div id="sensorTemp" class="value">--</div><div id="sensorAge" class="meta">--</div></article>
+                  <article class="card"><div class="label label-row"><svg class="icon sm"><use href="#icon-sensor"></use></svg>空气湿度</div><div id="sensorHum" class="value">--</div><div class="meta">采集端</div></article>
+                  <article class="card"><div class="label label-row"><svg class="icon sm"><use href="#icon-cloud"></use></svg>云端天气预报</div><div id="weatherDesc" class="value small">--</div><div id="weatherMeta" class="meta">--</div></article>
+                  <article class="card"><div class="label label-row"><svg class="icon sm"><use href="#icon-home"></use></svg>定位网络节点</div><div id="cityValue" class="value small">--</div><div id="weatherTime" class="meta">--</div></article>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel" data-panel="control">
+              <div class="panel-head">
+                <h2 class="section-title"><svg class="icon"><use href="#icon-control"></use></svg>设备功能交互控制</h2>
+                <span id="controlStatusText" class="muted">正在从底层缓存装载硬件标签...</span>
+              </div>
+              <div id="dynamicControlContainer" class="panel-body grid">
+                </div>
+            </section>
+          </div>
+
+          <aside class="stack">
+            <section class="panel" data-panel="topics"><div class="panel-head"><h2 class="section-title"><svg class="icon"><use href="#icon-topic"></use></svg>固件功能标签信道</h2></div><div class="panel-body"><div id="topicSub" class="topic">--</div><div id="topicRgb" class="topic">--</div><div id="topicStatus" class="topic">--</div></div></section>
+            <section class="panel" data-panel="logs"><div class="panel-head"><h2 class="section-title"><svg class="icon"><use href="#icon-log"></use></svg>底层数据帧监控日志</h2><button id="clearLogBtn" class="btn small" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-log"></use></svg>清空</span></button></div><div id="log" class="log"></div></section>
+          </aside>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script>
+    const STORAGE_KEY = "esp32_mqtt_devices_v3"; 
+    const SELECTED_KEY = "esp32_selected_device";
+    const THEME_KEY = "esp32_app_theme"; 
+    const MODE_KEY = "esp32_app_mode"; // ➔ 模式存储标识
+    const TOPIC_PREFIX = "iot/v1/devices";
+    const DEFAULT_BROKER = "wss://broker.emqx.io:8084/mqtt";
+    const OFFLINE_TIMEOUT_MS = 12000;
+    const T = {
+      noDevice: "未选择设备", noDevices: "暂无设备", mqttDisconnected: "MQTT 未连接", mqttConnecting: "MQTT 连接中", mqttConnected: "MQTT 已连接", mqttReconnect: "MQTT 重连中",
+      deviceOnline: "设备在线", deviceOffline: "设备离线 (只读历史界面)", deviceWaiting: "等待设备握手", added: "已添加设备 ", removed: "已删除设备 ", emptyId: "保存失败：设备唯一ID不能为空",
+      notSentNoDevice: "未发送：未选择设备", notSentOffline: "未发送：MQTT 未连接", subscribe: "监听频道 ", subscribeFail: "监听失败 ", nonJson: "非标准 JSON 帧",
+      heartbeatOffline: "数据超时断开判定", recovered: "重新恢复心跳", last: "最新帧 ", synced: " (设备已同步)", pending: " (等待下发)"
+    };
+
+    const els = Object.fromEntries(Array.from(document.querySelectorAll("[id]")).map(el => [el.id, el]));
+    let client = null, devices = loadDevices(), selectedId = "", activeView = "devices", stateByDevice = {}, currentColor = "#6366f1";
+
+    // 🌓 明暗主题控制逻辑
+    function initTheme() {
+      const savedTheme = localStorage.getItem(THEME_KEY) || "dark";
+      document.documentElement.setAttribute("data-theme", savedTheme);
+    }
+    function toggleTheme() {
+      const currentTheme = document.documentElement.getAttribute("data-theme");
+      const newTheme = currentTheme === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", newTheme);
+      localStorage.setItem(THEME_KEY, newTheme);
+      log("主题已切换为: " + (newTheme === "dark" ? "暗黑科技" : "现代明亮"));
+    }
+
+    // 🛠️ 界面模式联动控制系统 (新增)
+    function initMode() {
+      const savedMode = localStorage.getItem(MODE_KEY) || "user"; // 默认普通用户纯净模式
+      document.documentElement.setAttribute("data-mode", savedMode);
+    }
+    function toggleMode() {
+      const currentMode = document.documentElement.getAttribute("data-mode");
+      const newMode = currentMode === "developer" ? "user" : "developer";
+      document.documentElement.setAttribute("data-mode", newMode);
+      localStorage.setItem(MODE_KEY, newMode);
+      log("界面视图模式已重载为: " + (newMode === "developer" ? "👨‍💻 开发极客调试" : "🏡 纯净普通用户"));
+    }
+
+    // 读取设备，确保携带 features 缓存节点
+    function loadDevices() { 
+      try { 
+        const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); 
+        return Array.isArray(data) ? data.map(d => ({ features: { hasRgb: false, hasClock: false }, ...d })) : []; 
+      } catch (err) { 
+        return []; 
+      } 
+    }
+    function saveDevices() { localStorage.setItem(STORAGE_KEY, JSON.stringify(devices)); if (selectedId) localStorage.setItem(SELECTED_KEY, selectedId); else localStorage.removeItem(SELECTED_KEY); }
+    function normalizeDeviceId(value) { return (value || "").trim().replace(/\s+/g, ""); }
+    function baseTopic(deviceId) { return TOPIC_PREFIX + "/" + deviceId; }
+    function topic(deviceId, suffix) { return baseTopic(deviceId) + suffix; }
+    function selectedDevice() { return devices.find(d => d.device_id === selectedId) || null; }
+    function escapeHtml(text) { return String(text || "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[ch])); }
+    function log(line) { const item = document.createElement("div"); item.textContent = new Date().toLocaleTimeString("zh-CN", { hour12: false }) + " ➔ " + line; els.log.prepend(item); while (els.log.children.length > 120) els.log.lastChild.remove(); }
+    function setDot(el, status) { el.className = "dot " + status; }
+    function setMqttState(status, text) { setDot(els.mqttDot, status); els.mqttText.textContent = text; els.mqttState.textContent = text.replace("MQTT ", ""); els.connectionStateText.textContent = text; }
+    function fmtAge(ms) { if (!Number.isFinite(ms) || ms < 0) return "--"; if (ms < 1000) return "刚刚"; const s = Math.floor(ms / 1000); if (s < 60) return s + "秒前"; const m = Math.floor(s / 60); if (m < 60) return m + "分钟前"; return Math.floor(m / 60) + "小时前"; }
+    function fmtUptime(ms) { if (!Number.isFinite(ms)) return "--"; const s = Math.floor(ms / 1000); return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m " + (s % 60) + "s"; }
+    function hexToRgb(hex) { const v = hex.replace("#", ""); return { r: parseInt(v.slice(0, 2), 16), g: parseInt(v.slice(2, 4), 16), b: parseInt(v.slice(4, 6), 16) }; }
+    function rgbToHex(r, g, b) { return "#" + [r, g, b].map(v => Math.max(0, Math.min(255, Number(v) || 0)).toString(16).padStart(2, "0")).join(""); }
+    function deviceStatusInfo(snap) { if (snap.online === true) return { dot: "ok", text: T.deviceOnline }; if (snap.online === false) return { dot: "bad", text: T.deviceOffline }; return { dot: "wait", text: T.deviceWaiting }; }
+    
+    function selectDevice(deviceId) { 
+      selectedId = deviceId; 
+      activeView = "detail"; 
+      saveDevices(); 
+      subscribeAll(); 
+      render(); 
+      const snap = stateByDevice[deviceId] || {};
+      if (snap.online === true) {
+        publishJson("/cmd/query_features", {}, "验证硬件功能链");
+      }
+    }
+    
+    function showDeviceList() { selectedId = ""; activeView = "devices"; saveDevices(); render(); }
+    function setActiveView(view) { if (view === "devices") { showDeviceList(); return; } if (view === "add" || view === "connection") selectedId = ""; activeView = view; saveDevices(); render(); if (view === "add") setTimeout(() => els.deviceNameInput.focus(), 0); }
+    
+    function renderMainDeviceGrid() {
+      els.mainDeviceGrid.innerHTML = ""; els.deviceCountText.textContent = devices.length ? devices.length + " 个节点" : T.noDevices;
+      if (!devices.length) { const empty = document.createElement("div"); empty.className = "card"; empty.textContent = T.noDevices; els.mainDeviceGrid.appendChild(empty); return; }
+      devices.forEach(device => {
+        const snap = stateByDevice[device.device_id] || {}; const status = deviceStatusInfo(snap); const button = document.createElement("button"); button.type = "button"; button.className = "device-card-btn";
+        button.innerHTML = '<div class="device-card-icon"><svg class="icon"><use href="#icon-sensor"></use></svg></div>' + '<div class="device-card-title">' + escapeHtml(device.name || device.device_id) + '</div>' + '<div class="device-card-status"><i class="dot ' + status.dot + '"></i><span>' + status.text + '</span></div>';
+        button.addEventListener("click", () => selectDevice(device.device_id)); els.mainDeviceGrid.appendChild(button);
+      });
+    }
+
+    // 💡 功能控制组件 HTML 渲染模板（支持在线判定与置灰隔离属性）
+    function createRgbCardHtml(isOnline) {
+      const dis = isOnline ? "" : "disabled";
+      return `
+        <article class="card ${isOnline ? '' : 'offline-lock'}" style="flex: 1 1 280px;">
+          <h3 class="section-title"><svg class="icon sm"><use href="#icon-color"></use></svg>RGB 氛围颜色控制 ${isOnline ? '' : '(离线只读)'}</h3>
+          <div class="rgb" style="margin-top:12px">
+            <div id="swatch" class="swatch"></div>
+            <div class="stack">
+              <input id="colorInput" type="color" value="${currentColor}" ${dis}>
+              <div class="presets">
+                <button class="preset" data-color="#ff0000" style="background:#ff0000" type="button" ${dis}></button>
+                <button class="preset" data-color="#00ff00" style="background:#00ff00" type="button" ${dis}></button>
+                <button class="preset" data-color="#0000ff" style="background:#0000ff" type="button" ${dis}></button>
+                <button class="preset" data-color="#ffffff" style="background:#ffffff" type="button" ${dis}></button>
+              </div>
+              <button id="sendColorBtn" class="btn primary block" type="button" ${dis}><span class="btn-content"><svg class="icon sm"><use href="#icon-color"></use></svg>同步灯效色彩</span></button>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function createClockCardHtml(isOnline) {
+      const dis = isOnline ? "" : "disabled";
+      return `
+        <article class="card ${isOnline ? '' : 'offline-lock'}" style="flex: 1 1 280px;">
+          <h3 class="section-title"><svg class="icon sm"><use href="#icon-clock"></use></svg>像素时钟矩阵控制 ${isOnline ? '' : '(离线只读)'}</h3>
+          <div class="form-grid" style="margin-top:12px">
+            <div class="field">
+              <label for="clockMode">显示模式选择</label>
+              <input id="clockMode" value="time" placeholder="time / date / weather" ${dis}>
+            </div>
+            <div class="field">
+              <label for="clockBrightness">面板亮度 (0-255)</label>
+              <input id="clockBrightness" type="number" min="0" max="255" value="100" ${dis}>
+            </div>
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="clockText">屏幕滚动字幕/弹幕</label>
+            <input id="clockText" placeholder="键入要在点阵上轮播的单行文本..." ${dis}>
+          </div>
+          <button id="sendClockBtn" class="btn primary block" type="button" ${dis}><span class="btn-content"><svg class="icon sm"><use href="#icon-clock"></use></svg>同步时钟显示属性</span></button>
+        </article>
+      `;
+    }
+
+    // ⚙️ 核心动态界面绘制逻辑
+    function render() {
+      const device = selectedDevice(); renderMainDeviceGrid(); if (!device && activeView === "detail") activeView = "devices";
+      els.mainHeader.hidden = activeView !== "detail"; els.connectionView.hidden = activeView !== "connection"; els.deviceListView.hidden = activeView !== "devices"; els.addDeviceView.hidden = activeView !== "add"; els.deviceDetailView.hidden = activeView !== "detail" || !device; els.backToListBtn.hidden = activeView !== "detail"; els.resubBtn.hidden = activeView !== "detail"; els.removeDeviceBtn.hidden = activeView !== "detail";
+      
+      const navView = activeView === "detail" ? "devices" : activeView;
+      document.querySelectorAll("[data-view]").forEach(btn => { btn.classList.toggle("active", btn.dataset.view === navView); });
+      
+      if (!device) { 
+        els.deviceText.textContent = T.noDevice; els.lastSeenText.textContent = "最近消息 --"; els.selectedTopic.textContent = "--"; els.telemetryTopic.textContent = "--"; updateTelemetry({}); updateTopics(""); 
+        return; 
+      }
+      
+      const snap = stateByDevice[device.device_id] || {}; 
+      const isOnline = (snap.online === true); 
+      
+      updateSelectedDeviceStatus(); 
+      els.selectedTopic.textContent = baseTopic(device.device_id); 
+      els.telemetryTopic.textContent = topic(device.device_id, "/telemetry"); 
+      updateTopics(device.device_id); 
+      updateTelemetry(snap.telemetry || {});
+      
+      let containerHtml = "";
+      let hasRgb = device.features?.hasRgb || false;
+      let hasClock = device.features?.hasClock || false;
+
+      if (snap.telemetry) {
+        if (snap.telemetry.hasOwnProperty("rgb_r") || snap.rgb) hasRgb = true;
+        if (snap.telemetry.hasOwnProperty("clock_mode") || snap.telemetry.clock) hasClock = true;
+        
+        if (device.features.hasRgb !== hasRgb || device.features.hasClock !== hasClock) {
+          device.features.hasRgb = hasRgb;
+          device.features.hasClock = hasClock;
+          saveDevices();
+        }
+      }
+
+      if (hasRgb) containerHtml += createRgbCardHtml(isOnline);
+      if (hasClock) containerHtml += createClockCardHtml(isOnline);
+
+      if (!hasRgb && !hasClock) {
+        containerHtml = `<div class="empty-hint">📡 暂无本地组件缓存，等待该设备联机上报支持的功能标签...</div>`;
+        els.controlStatusText.textContent = isOnline ? "等待设备响应中" : "设备离线且无本地功能缓存";
+      } else {
+        els.controlStatusText.textContent = `加载本地持久层 UI ➔ ${hasRgb ? '[氛围灯] ' : ''}${hasClock ? '[点阵时钟]' : ''} ${isOnline ? '(实时受控)' : '(离线记忆挂载)'}`;
+      }
+
+      els.dynamicControlContainer.innerHTML = containerHtml;
+
+      if (hasRgb && isOnline) {
+        const cInput = document.getElementById("colorInput");
+        const swatch = document.getElementById("swatch");
+        const sColorBtn = document.getElementById("sendColorBtn");
+        
+        if (cInput && swatch && sColorBtn) {
+          if (snap.rgb) currentColor = rgbToHex(snap.rgb.r, snap.rgb.g, snap.rgb.b);
+          cInput.value = currentColor;
+          swatch.style.background = currentColor;
+          
+          cInput.addEventListener("input", evt => {
+            currentColor = evt.target.value;
+            swatch.style.background = currentColor;
+          });
+          sColorBtn.addEventListener("click", () => publishColor(currentColor));
+          
+          document.querySelectorAll(".preset").forEach(pBtn => {
+            pBtn.addEventListener("click", () => {
+              currentColor = pBtn.dataset.color;
+              cInput.value = currentColor;
+              swatch.style.background = currentColor;
+              publishColor(currentColor);
+            });
+          });
+        }
+      }
+
+      if (hasClock && isOnline) {
+        const sClockBtn = document.getElementById("sendClockBtn");
+        if (sClockBtn) {
+          sClockBtn.addEventListener("click", () => {
+            const mode = document.getElementById("clockMode").value.trim() || "time";
+            const brightness = parseInt(document.getElementById("clockBrightness").value, 10) || 100;
+            const text = document.getElementById("clockText").value.trim();
+            
+            publishJson("/cmd/clock", { mode, brightness, text }, "点阵像素钟控制帧");
+          });
+        }
+      }
+    }
+
+    function updateTopics(deviceId) { 
+      if (!deviceId) { els.topicSub.textContent = "--"; els.topicRgb.textContent = "--"; els.topicStatus.textContent = "--"; return; } 
+      els.topicSub.textContent = "监听广播: " + topic(deviceId, "/#"); 
+      els.topicRgb.textContent = "下发指令: " + topic(deviceId, "/cmd/rgb") + " | " + topic(deviceId, "/cmd/clock") + " | " + topic(deviceId, "/cmd/query_features"); 
+      els.topicStatus.textContent = "应答状态: " + topic(deviceId, "/state/#") + " | " + topic(deviceId, "/telemetry"); 
+    }
+    
+    function updateTelemetry(data) { 
+      const sensorOk = !!data.sensor_ok; 
+      els.sensorTemp.textContent = sensorOk && Number.isFinite(Number(data.sensor_temp)) ? Number(data.sensor_temp).toFixed(1) + " °C" : "--"; 
+      els.sensorHum.textContent = sensorOk && Number.isFinite(Number(data.sensor_humidity)) ? Number(data.sensor_humidity).toFixed(1) + " %" : "--"; 
+      els.sensorAge.textContent = data.sensor_age != null ? "刷新: " + fmtAge(Number(data.sensor_age)) : "--"; 
+      els.sensorState.textContent = sensorOk ? "传感器在线" : "未上报"; 
+      els.sensorMeta.textContent = sensorOk ? "AHT30 外设驱动" : "等待传感器"; 
+      els.wifiState.textContent = data.sta_connected ? "Wi-Fi 接入" : data.sta_connected === false ? "Wi-Fi 断开" : "--"; 
+      els.wifiMeta.textContent = data.sta_ip ? data.sta_ip + " / " + data.wifi_rssi + " dBm" : "--"; 
+      els.heapValue.textContent = Number.isFinite(Number(data.free_heap)) ? Math.round(Number(data.free_heap) / 1024) + " KB" : "--"; 
+      els.uptimeValue.textContent = data.uptime != null ? "开机运行: " + fmtUptime(Number(data.uptime)) : "--"; 
+      els.weatherDesc.textContent = data.weather_desc || "--"; 
+      els.weatherMeta.textContent = data.weather_temp ? data.weather_temp + " °C / " + (data.weather_humidity || "--") + " %" : "--"; 
+      els.cityValue.textContent = data.city || "--"; 
+      els.weatherTime.textContent = data.weather_time || "--"; 
+    }
+    
+    function updateSelectedDeviceStatus() { const device = selectedDevice(); if (!device) { els.deviceText.textContent = T.noDevice; els.lastSeenText.textContent = "最近消息 --"; return; } const snap = stateByDevice[device.device_id] || {}; els.deviceText.textContent = snap.online === true ? T.deviceOnline : snap.online === false ? T.deviceOffline : T.deviceWaiting; els.lastSeenText.textContent = snap.last_seen ? T.last + fmtAge(Date.now() - snap.last_seen) : "最近消息 --"; }
+    
+    // 🌐 MQTT底层连接管理层
+    function connectMqtt() {
+      if (!window.mqtt) { setMqttState("bad", "MQTT.js 未正常加载"); return; }
+      if (client) client.end(true); 
+      setMqttState("wait", T.mqttConnecting); log("发起网关握手代理服务: " + DEFAULT_BROKER);
+      client = mqtt.connect(DEFAULT_BROKER, { clientId: "control_panel_" + Math.random().toString(16).slice(2), clean: true, reconnectPeriod: 2000, connectTimeout: 8000, keepalive: 60 });
+      client.on("connect", () => { setMqttState("ok", T.mqttConnected); log("代理通道就绪 (已联接网关)"); subscribeAll(); });
+      client.on("reconnect", () => setMqttState("wait", T.mqttReconnect));
+      client.on("close", () => setMqttState("bad", T.mqttDisconnected));
+      client.on("error", err => log("网关握手报错: " + err.message));
+      client.on("message", handleMessage);
+    }
+    
+    function disconnectMqtt() { if (client) client.end(true); setMqttState("bad", T.mqttDisconnected); log("断开代理连接"); }
+    
+    function subscribeAll() { 
+      if (!client || !client.connected) return; 
+      devices.forEach(device => { 
+        const sub = topic(device.device_id, "/#"); 
+        client.subscribe(sub, { qos: 0 }, err => log(err ? T.subscribeFail + sub : T.subscribe + sub)); 
+      }); 
+    }
+    
+    // 📥 核心数据报文总线路由
+    function handleMessage(rawTopic, payloadBuffer) {
+      const matched = devices.find(device => rawTopic.startsWith(baseTopic(device.device_id) + "/")); if (!matched) return;
+      const payload = payloadBuffer.toString(); const snap = stateByDevice[matched.device_id] || {}; const wasOffline = snap.online === false; snap.last_seen = Date.now(); snap.offline_logged = false;
+      let data = null; try { data = JSON.parse(payload); } catch (err) { log(rawTopic + " -> " + T.nonJson); return; }
+      
+      if (rawTopic.endsWith("/telemetry")) { 
+        snap.telemetry = data; 
+        if (typeof data.sta_connected === "boolean") snap.online = data.sta_connected; 
+        if (Number.isFinite(data.rgb_r) && Number.isFinite(data.rgb_g) && Number.isFinite(data.rgb_b)) { 
+          snap.rgb = { r: data.rgb_r, g: data.rgb_g, b: data.rgb_b }; 
+        }
+        if (data.clock_mode) {
+          snap.clock = { mode: data.clock_mode, brightness: data.clock_brightness || 100 };
+        }
+      }
+      else if (rawTopic.endsWith("/status")) { 
+        snap.online = !!data.online; 
+        log(`[${matched.name}] 状态同步生命周期包 -> ` + (snap.online ? T.deviceOnline : T.deviceOffline)); 
+      }
+      else if (rawTopic.endsWith("/state/features")) {
+        const hasRgb = !!data.has_rgb;
+        const hasClock = !!data.has_clock;
+        log(`[${matched.name}] 上报固件功能清单 ➔ RGB氛围灯:${hasRgb}, 点阵时钟:${hasClock}`);
+        
+        if (matched.features.hasRgb !== hasRgb || matched.features.hasClock !== hasClock) {
+          matched.features.hasRgb = hasRgb;
+          matched.features.hasClock = hasClock;
+          saveDevices(); 
+          log(`[${matched.name}] 检测到固件功能集发生更新，前端已静默刷新 UI 组件缓存。`);
+        }
+      }
+      else if (rawTopic.endsWith("/state/rgb")) { if (Number.isFinite(data.r) && Number.isFinite(data.g) && Number.isFinite(data.b)) snap.rgb = { r: data.r, g: data.g, b: data.b }; }
+      else if (rawTopic.endsWith("/ack")) { log(`设备回执回复 [ID:${data.request_id}] -> 成功`); }
+      
+      if (wasOffline && snap.online === true) { 
+        log(`通知: [${matched.name}] 重新握手联通恢复`); 
+        setTimeout(() => {
+          if (selectedId === matched.device_id) {
+            publishJson("/cmd/query_features", {}, "核验最新固件特征集");
+          }
+        }, 300);
+      }
+      
+      stateByDevice[matched.device_id] = snap; render();
+    }
+
+    function checkDeviceHeartbeat() { const now = Date.now(); let changed = false; devices.forEach(device => { const snap = stateByDevice[device.device_id]; if (!snap || !snap.last_seen) return; if (now - snap.last_seen > OFFLINE_TIMEOUT_MS && snap.online !== false) { snap.online = false; snap.offline_logged = true; log(`警告: [${device.name || device.device_id}] 心跳丢失已强制置为离线`); changed = true; } }); if (changed) render(); }
+    function publishJson(suffix, payload, label) { const device = selectedDevice(); if (!device) { log(label + " " + T.notSentNoDevice); return; } if (!client || !client.connected) { log(label + " " + T.notSentOffline); return; } const target = topic(device.device_id, suffix); const body = JSON.stringify({ request_id: "panel-" + Date.now(), ...payload }); client.publish(target, body, { qos: 1, retain: false }, err => { log(err ? label + " 指令发布异常" : `${label} 指令发往 ➔ ${target}`); }); }
+    function publishColor(hex) { const rgb = hexToRgb(hex); publishJson("/cmd/rgb", { r: rgb.r, g: rgb.g, b: rgb.b, hex }, "氛围色彩"); }
+    
+    function addDevice() {
+      const deviceId = normalizeDeviceId(els.deviceIdInput.value); if (!deviceId) { alert(T.emptyId); return; }
+      if (devices.some(d => d.device_id === deviceId)) { selectedId = deviceId; activeView = "detail"; saveDevices(); render(); return; }
+      
+      devices.push({ 
+        name: els.deviceNameInput.value.trim() || ("未命名-" + deviceId.slice(-4)), 
+        device_id: deviceId,
+        features: { hasRgb: false, hasClock: false }
+      });
+      
+      selectedId = deviceId; activeView = "detail"; els.deviceNameInput.value = ""; els.deviceIdInput.value = ""; saveDevices(); subscribeAll(); render(); 
+      log("成功注册新硬件MAC指针: " + deviceId);
+      
+      setTimeout(() => {
+        publishJson("/cmd/query_features", {}, "首次加载硬件功能轮询");
+      }, 500);
+    }
+    function removeDevice() { const device = selectedDevice(); if (!device) return; if(!confirm("确定要移除该设备映射吗？")) return; devices = devices.filter(d => d.device_id !== device.device_id); delete stateByDevice[device.device_id]; selectedId = ""; saveDevices(); render(); log(T.removed + device.device_id); }
+
+    // 事件绑定层
+    els.toggleThemeBtn.addEventListener("click", toggleTheme);
+    els.toggleModeBtn.addEventListener("click", toggleMode); // ➔ 绑定模式切换事件
+    els.connectBtn.addEventListener("click", connectMqtt);
+    els.disconnectBtn.addEventListener("click", disconnectMqtt);
+    [els.deviceNameInput, els.deviceIdInput].forEach(input => { input.addEventListener("keydown", evt => { if (evt.key === "Enter") addDevice(); }); });
+    els.backToListBtn.addEventListener("click", showDeviceList);
+    document.querySelectorAll("[data-view]").forEach(btn => { btn.addEventListener("click", () => setActiveView(btn.dataset.view)); });
+    els.resubBtn.addEventListener("click", subscribeAll);
+    els.addDeviceBtn.addEventListener("click", addDevice);
+    els.removeDeviceBtn.addEventListener("click", removeDevice);
+    els.clearLogBtn.addEventListener("click", () => { els.log.innerHTML = ""; });
+
+    initTheme();
+    initMode(); // ➔ 初始化读取视图状态
+    els.brokerText.textContent = DEFAULT_BROKER; setMqttState("bad", T.mqttDisconnected);
+    render(); connectMqtt();
+    setInterval(() => { checkDeviceHeartbeat(); updateSelectedDeviceStatus(); }, 1000);
+  </script>
+</body>
+</html>

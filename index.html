@@ -1,12 +1,17 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>ESP32 &#x8fdc;&#x7a0b;&#x8bbe;&#x5907;&#x7ba1;&#x7406;</title>
   <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="ESP32 管理">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <style>
     :root {
       --bg: #eef2f6;
@@ -35,15 +40,18 @@
     button, input { font: inherit; }
     .app {
       min-height: 100vh;
-      display: grid;
-      grid-template-columns: 300px minmax(0, 1fr);
+      width: 100%;
+      display: flex;
+      align-items: stretch;
     }
     .sidebar {
+      width: 300px;
+      flex: 0 0 300px;
       background: var(--nav);
       color: #e5edf5;
       padding: 16px;
-      display: grid;
-      grid-template-rows: auto auto minmax(0,1fr);
+      display: flex;
+      flex-direction: column;
       gap: 14px;
       min-height: 100vh;
     }
@@ -100,6 +108,32 @@
       display: grid;
       gap: 10px;
     }
+    .add-device-action {
+      display: flex;
+    }
+    .side-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .nav-btn {
+      min-height: 38px;
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 8px;
+      background: rgba(255,255,255,.05);
+      color: #dce7f2;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      text-align: left;
+    }
+    .nav-btn.active {
+      background: rgba(15,118,110,.32);
+      border-color: rgba(45,212,191,.5);
+      color: #fff;
+    }
     .field label {
       display: block;
       color: var(--muted);
@@ -141,10 +175,11 @@
     .btn.block { width: 100%; }
     .btn.small { min-height: 32px; padding: 0 10px; font-size: 13px; }
     .devices {
-      display: grid;
+      display: flex;
+      flex-direction: column;
       gap: 8px;
       overflow: auto;
-      align-content: start;
+      min-height: 0;
     }
     .device-btn {
       border: 1px solid rgba(255,255,255,.1);
@@ -154,6 +189,7 @@
       padding: 10px;
       text-align: left;
       cursor: pointer;
+      min-height: 74px;
     }
     .device-btn.active {
       background: rgba(15,118,110,.28);
@@ -172,6 +208,128 @@
       font-size: 12px;
       overflow-wrap: anywhere;
     }
+    .device-list-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+    .device-thumb {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      background: rgba(45,212,191,.16);
+      color: #5eead4;
+      border: 1px solid rgba(45,212,191,.28);
+    }
+    .device-list-main {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .device-overview-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: stretch;
+    }
+    .device-card-btn {
+      flex: 1 1 180px;
+      max-width: 220px;
+      min-height: 126px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text);
+      padding: 14px;
+      text-align: left;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .device-card-btn:hover {
+      border-color: rgba(15,118,110,.5);
+    }
+    .device-card-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .device-card-icon {
+      width: 54px;
+      height: 54px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: #e6f7f4;
+      color: var(--brand);
+      border: 1px solid #c7ebe5;
+    }
+    .device-card-title {
+      font-weight: 800;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+    .connection-status-card {
+      max-width: 520px;
+    }
+    .add-device-view-card {
+      max-width: 520px;
+    }
+    .view[hidden] {
+      display: none;
+    }
+    [data-panel][hidden] {
+      display: none !important;
+    }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background: rgba(17,24,39,.45);
+    }
+    .modal-backdrop[hidden] {
+      display: none;
+    }
+    .modal {
+      width: min(460px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 24px 70px rgba(17,24,39,.28);
+      overflow: hidden;
+    }
+    .modal-head {
+      min-height: 52px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: #fbfdff;
+    }
+    .modal-body {
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 0 16px 16px;
+    }
     .dot {
       width: 10px;
       height: 10px;
@@ -184,6 +342,8 @@
     .dot.bad { background: var(--red); }
     .dot.wait { background: var(--amber); }
     .main {
+      flex: 1 1 auto;
+      width: 100%;
       min-width: 0;
       padding: 16px;
     }
@@ -219,6 +379,7 @@
       font-size: 13px;
     }
     .region {
+      width: 100%;
       margin-top: 12px;
       display: grid;
       gap: 10px;
@@ -231,11 +392,12 @@
       padding: 0 4px;
     }
     .grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      display: flex;
+      flex-wrap: wrap;
       gap: 12px;
     }
-    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid > .card { flex: 1 1 220px; }
+    .grid.two > .card { flex-basis: 300px; }
     .card {
       min-height: 112px;
       padding: 14px;
@@ -276,12 +438,33 @@
       gap: 12px;
     }
     .layout {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 360px;
+      display: flex;
+      flex-wrap: wrap;
       gap: 12px;
       align-items: start;
     }
-    .stack { display: grid; gap: 12px; }
+    .layout > .stack:first-child {
+      flex: 1 1 620px;
+      min-width: 0;
+    }
+    .layout > aside.stack {
+      flex: 0 1 420px;
+      min-width: 320px;
+    }
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    #deviceDetailView .layout {
+      display: block;
+    }
+    #deviceDetailView .layout > .stack {
+      display: contents;
+    }
+    #deviceDetailView .panel[data-panel] {
+      margin-top: 12px;
+    }
     .form-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -348,20 +531,73 @@
       font-size: 13px;
     }
     @media (max-width: 1180px) {
-      .app { grid-template-columns: 1fr; }
-      .sidebar { min-height: auto; }
-      .devices { max-height: 260px; }
-      .layout { grid-template-columns: 1fr; }
-      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .sidebar {
+        width: 210px;
+        flex-basis: 210px;
+      }
+      .side-nav {
+        flex-direction: column;
+      }
+      .nav-btn {
+        min-width: 0;
+      }
+      .layout > .stack:first-child,
+      .layout > aside.stack {
+        flex-basis: 100%;
+        min-width: 0;
+      }
     }
     @media (max-width: 680px) {
+      .sidebar {
+        width: 92px;
+        flex-basis: 92px;
+        padding: 10px 8px;
+        gap: 10px;
+      }
+      .brand {
+        justify-content: center;
+        padding-bottom: 10px;
+      }
+      .brand > div:last-child {
+        display: none;
+      }
+      .brand-mark {
+        width: 42px;
+        height: 42px;
+        font-size: 12px;
+      }
+      .nav-btn {
+        min-height: 72px;
+        padding: 8px 6px;
+        flex-direction: column;
+        justify-content: center;
+        text-align: center;
+        line-height: 1.25;
+        font-size: 13px;
+      }
       .main { padding: 10px; }
       .hero, .region-head { align-items: flex-start; flex-direction: column; }
-      .grid, .grid.two, .form-grid { grid-template-columns: 1fr; }
+      .device-overview-grid { gap: 10px; }
+      .device-card-btn {
+        flex-basis: 150px;
+        max-width: none;
+        min-height: 112px;
+        padding: 12px;
+      }
+      .device-card-icon {
+        width: 42px;
+        height: 42px;
+      }
+      .grid > .card, .grid.two > .card { flex-basis: 100%; }
+      .form-grid { grid-template-columns: 1fr; }
       .rgb { grid-template-columns: 1fr; }
       .swatch { width: 100%; }
       .btn { width: 100%; }
+      .modal-actions { flex-direction: column-reverse; }
       .value { font-size: 23px; }
+    }
+    @media (max-width: 420px) {
+      .device-card-btn { flex-basis: 100%; }
     }
   </style>
 </head>
@@ -420,32 +656,15 @@
         </div>
       </div>
 
-      <section class="side-box">
-        <h3 class="section-title"><svg class="icon sm"><use href="#icon-plug"></use></svg>&#x8fde;&#x63a5;&#x914d;&#x7f6e;</h3>
-        <div class="muted">&#x9875;&#x9762;&#x6253;&#x5f00;&#x540e;&#x4f1a;&#x81ea;&#x52a8;&#x8fde;&#x63a5;&#x4e91;&#x7aef; MQTT&#xff0c;&#x7528;&#x6237;&#x4e0d;&#x9700;&#x8981;&#x9009;&#x62e9;&#x670d;&#x52a1;&#x5668;&#x3002;</div>
-        <div id="brokerText" class="device-meta">--</div>
-        <button id="connectBtn" class="btn primary block" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-cloud"></use></svg>&#x91cd;&#x65b0;&#x8fde;&#x63a5;</span></button>
-        <button id="disconnectBtn" class="btn block" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-plug"></use></svg>&#x65ad;&#x5f00;&#x8fde;&#x63a5;</span></button>
-      </section>
-
-      <section class="side-box">
-        <h3 class="section-title"><svg class="icon sm"><use href="#icon-plus"></use></svg>&#x6dfb;&#x52a0;&#x8bbe;&#x5907;</h3>
-        <div class="field">
-          <label for="deviceNameInput">&#x8bbe;&#x5907;&#x540d;&#x79f0;</label>
-          <input id="deviceNameInput" placeholder="&#x5367;&#x5ba4;&#x4f20;&#x611f;&#x5668;">
-        </div>
-        <div class="field">
-          <label for="deviceIdInput">&#x8bbe;&#x5907; ID</label>
-          <input id="deviceIdInput" placeholder="esp32s3-34B7DA12ABCD">
-        </div>
-        <button id="addDeviceBtn" class="btn primary block" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-plus"></use></svg>&#x6dfb;&#x52a0;&#x8bbe;&#x5907;</span></button>
-      </section>
-
-      <section class="devices" id="deviceList"></section>
+      <nav id="sideNav" class="side-nav">
+        <button class="nav-btn" type="button" data-view="connection"><svg class="icon sm"><use href="#icon-plug"></use></svg>&#x8fde;&#x63a5;&#x914d;&#x7f6e;</button>
+        <button class="nav-btn active" type="button" data-view="devices"><svg class="icon sm"><use href="#icon-device"></use></svg>&#x6211;&#x7684;&#x8bbe;&#x5907;</button>
+        <button class="nav-btn" type="button" data-view="add"><svg class="icon sm"><use href="#icon-plus"></use></svg>&#x6dfb;&#x52a0;&#x8bbe;&#x5907;</button>
+      </nav>
     </aside>
 
     <main class="main">
-      <header class="hero">
+      <header id="mainHeader" class="hero" hidden>
         <div>
           <h1 class="section-title"><svg class="icon"><use href="#icon-home"></use></svg>&#x8fdc;&#x7a0b;&#x8bbe;&#x5907;&#x7ba1;&#x7406;</h1>
           <div class="status-line">
@@ -456,12 +675,57 @@
           </div>
         </div>
         <div class="status-line">
+          <button id="backToListBtn" class="btn" type="button" hidden><span class="btn-content"><svg class="icon sm"><use href="#icon-device"></use></svg>&#x8bbe;&#x5907;&#x5217;&#x8868;</span></button>
           <button id="resubBtn" class="btn" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-topic"></use></svg>&#x91cd;&#x65b0;&#x8ba2;&#x9605;</span></button>
+          <button id="installAppBtn" class="btn" type="button" hidden><span class="btn-content"><svg class="icon sm"><use href="#icon-device"></use></svg>&#x5b89;&#x88c5;APP</span></button>
           <button id="removeDeviceBtn" class="btn danger" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-device"></use></svg>&#x5220;&#x9664;&#x8bbe;&#x5907;</span></button>
         </div>
       </header>
 
-      <section class="region">
+      <section id="connectionView" class="region view" hidden>
+        <div class="region-head">
+          <h2 class="section-title"><svg class="icon"><use href="#icon-plug"></use></svg>&#x8fde;&#x63a5;&#x914d;&#x7f6e;</h2>
+        </div>
+        <article class="card connection-status-card">
+          <div class="label label-row"><svg class="icon sm"><use href="#icon-cloud"></use></svg>MQTT &#x670d;&#x52a1;&#x5668;&#x72b6;&#x6001;</div>
+          <div id="connectionStateText" class="value small">--</div>
+          <div id="brokerText" class="meta">--</div>
+          <div class="grid" style="margin-top:14px">
+            <button id="connectBtn" class="btn primary" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-cloud"></use></svg>&#x91cd;&#x65b0;&#x8fde;&#x63a5;</span></button>
+            <button id="disconnectBtn" class="btn" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-plug"></use></svg>&#x65ad;&#x5f00;&#x8fde;&#x63a5;</span></button>
+          </div>
+        </article>
+      </section>
+
+      <section id="deviceListView" class="region view">
+        <div class="region-head">
+          <h2 class="section-title"><svg class="icon"><use href="#icon-device"></use></svg>&#x6211;&#x7684;&#x8bbe;&#x5907;</h2>
+          <div id="deviceCountText" class="muted">--</div>
+        </div>
+        <div id="mainDeviceGrid" class="device-overview-grid"></div>
+      </section>
+
+      <section id="addDeviceView" class="region view" hidden>
+        <div class="region-head">
+          <h2 class="section-title"><svg class="icon"><use href="#icon-plus"></use></svg>&#x6dfb;&#x52a0;&#x8bbe;&#x5907;</h2>
+        </div>
+        <article class="card add-device-view-card">
+          <div class="form-grid">
+            <div class="field">
+              <label for="deviceNameInput">&#x8bbe;&#x5907;&#x540d;&#x79f0;</label>
+              <input id="deviceNameInput" placeholder="&#x5367;&#x5ba4;&#x4f20;&#x611f;&#x5668;">
+            </div>
+            <div class="field">
+              <label for="deviceIdInput">&#x8bbe;&#x5907; ID</label>
+              <input id="deviceIdInput" placeholder="esp32s3-34B7DA12ABCD">
+            </div>
+          </div>
+          <button id="addDeviceBtn" class="btn primary" type="button" style="margin-top:14px"><span class="btn-content"><svg class="icon sm"><use href="#icon-plus"></use></svg>&#x6dfb;&#x52a0;&#x8bbe;&#x5907;</span></button>
+        </article>
+      </section>
+
+      <div id="deviceDetailView" class="view" hidden>
+      <section class="region" data-panel="overview">
         <div class="region-head">
           <h2 class="section-title"><svg class="icon"><use href="#icon-device"></use></svg>&#x8bbe;&#x5907;&#x6982;&#x89c8;</h2>
           <div id="selectedTopic" class="muted">--</div>
@@ -492,7 +756,7 @@
 
       <section class="region layout">
         <div class="stack">
-          <section class="panel">
+          <section class="panel" data-panel="environment">
             <div class="panel-head">
               <h2 class="section-title"><svg class="icon"><use href="#icon-data"></use></svg>&#x73af;&#x5883;&#x6570;&#x636e;</h2>
               <span id="telemetryTopic" class="muted">--</span>
@@ -523,7 +787,7 @@
             </div>
           </section>
 
-          <section class="panel">
+          <section class="panel" data-panel="control">
             <div class="panel-head">
               <h2 class="section-title"><svg class="icon"><use href="#icon-control"></use></svg>&#x8bbe;&#x5907;&#x63a7;&#x5236;</h2>
               <span id="rgbText" class="muted">#000000</span>
@@ -570,7 +834,7 @@
         </div>
 
         <aside class="stack">
-          <section class="panel">
+          <section class="panel" data-panel="topics">
             <div class="panel-head">
               <h2 class="section-title"><svg class="icon"><use href="#icon-topic"></use></svg>&#x4e3b;&#x9898;&#x6620;&#x5c04;</h2>
             </div>
@@ -580,7 +844,7 @@
               <div id="topicStatus" class="topic">--</div>
             </div>
           </section>
-          <section class="panel">
+          <section class="panel" data-panel="logs">
             <div class="panel-head">
               <h2 class="section-title"><svg class="icon"><use href="#icon-log"></use></svg>&#x4e8b;&#x4ef6;&#x65e5;&#x5fd7;</h2>
               <button id="clearLogBtn" class="btn small" type="button"><span class="btn-content"><svg class="icon sm"><use href="#icon-log"></use></svg>&#x6e05;&#x7a7a;</span></button>
@@ -589,6 +853,7 @@
           </section>
         </aside>
       </section>
+      </div>
     </main>
   </div>
 
@@ -598,9 +863,10 @@
     const SELECTED_KEY = "esp32_selected_device";
     const TOPIC_PREFIX = "iot/v1/devices";
     const DEFAULT_BROKER = "wss://broker.emqx.io:8084/mqtt";
+    const OFFLINE_TIMEOUT_MS = 12000;
     const T = {
       noDevice: "\u672a\u9009\u62e9\u8bbe\u5907",
-      noDevices: "\u6682\u65e0\u8bbe\u5907\uff0c\u8bf7\u5728\u4e0a\u65b9\u6dfb\u52a0\u8bbe\u5907 ID",
+      noDevices: "\u6682\u65e0\u8bbe\u5907",
       mqttDisconnected: "MQTT \u672a\u8fde\u63a5",
       mqttConnecting: "MQTT \u8fde\u63a5\u4e2d",
       mqttConnected: "MQTT \u5df2\u8fde\u63a5",
@@ -616,6 +882,8 @@
       subscribe: "\u8ba2\u9605 ",
       subscribeFail: "\u8ba2\u9605\u5931\u8d25 ",
       nonJson: "\u975e JSON \u6d88\u606f",
+      heartbeatOffline: "\u8d85\u8fc7 12 \u79d2\u672a\u6536\u5230\u6d88\u606f\uff0c\u5224\u5b9a\u79bb\u7ebf",
+      recovered: "\u6062\u590d\u5728\u7ebf",
       last: "\u6700\u8fd1\u6d88\u606f ",
       synced: " \u5df2\u540c\u6b65",
       pending: " \u5f85\u53d1\u9001"
@@ -624,9 +892,11 @@
     const els = Object.fromEntries(Array.from(document.querySelectorAll("[id]")).map(el => [el.id, el]));
     let client = null;
     let devices = loadDevices();
-    let selectedId = localStorage.getItem(SELECTED_KEY) || (devices[0] && devices[0].device_id) || "";
+    let selectedId = "";
+    let activeView = "devices";
     let stateByDevice = {};
     let currentColor = "#000000";
+    let deferredInstallPrompt = null;
 
     function loadDevices() {
       try {
@@ -639,6 +909,7 @@
     function saveDevices() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(devices));
       if (selectedId) localStorage.setItem(SELECTED_KEY, selectedId);
+      else localStorage.removeItem(SELECTED_KEY);
     }
     function normalizeDeviceId(value) {
       return (value || "").trim().replace(/\s+/g, "");
@@ -674,6 +945,7 @@
       setDot(els.mqttDot, status);
       els.mqttText.textContent = text;
       els.mqttState.textContent = text.replace("MQTT ", "");
+      els.connectionStateText.textContent = text;
     }
     function fmtAge(ms) {
       if (!Number.isFinite(ms) || ms < 0) return "--";
@@ -702,7 +974,61 @@
       els.swatch.style.background = currentColor;
       els.rgbText.textContent = currentColor.toUpperCase() + (fromDevice ? T.synced : T.pending);
     }
+    function deviceStatusInfo(snap) {
+      if (snap.online === true) return { dot: "ok", text: T.deviceOnline };
+      if (snap.online === false) return { dot: "bad", text: T.deviceOffline };
+      return { dot: "wait", text: T.deviceWaiting };
+    }
+    function selectDevice(deviceId) {
+      selectedId = deviceId;
+      activeView = "detail";
+      saveDevices();
+      subscribeAll();
+      render();
+    }
+    function showDeviceList() {
+      selectedId = "";
+      activeView = "devices";
+      saveDevices();
+      render();
+    }
+    function setActiveView(view) {
+      if (view === "devices") {
+        showDeviceList();
+        return;
+      }
+      if (view === "add" || view === "connection") selectedId = "";
+      activeView = view;
+      saveDevices();
+      render();
+      if (view === "add") setTimeout(() => els.deviceNameInput.focus(), 0);
+    }
+    function renderMainDeviceGrid() {
+      els.mainDeviceGrid.innerHTML = "";
+      els.deviceCountText.textContent = devices.length ? devices.length + " \u4e2a\u8bbe\u5907" : T.noDevices;
+      if (!devices.length) {
+        const empty = document.createElement("div");
+        empty.className = "card";
+        empty.textContent = T.noDevices;
+        els.mainDeviceGrid.appendChild(empty);
+        return;
+      }
+      devices.forEach(device => {
+        const snap = stateByDevice[device.device_id] || {};
+        const status = deviceStatusInfo(snap);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "device-card-btn";
+        button.innerHTML =
+          '<div class="device-card-icon"><svg class="icon"><use href="#icon-sensor"></use></svg></div>' +
+          '<div class="device-card-title">' + escapeHtml(device.name || device.device_id) + '</div>' +
+          '<div class="device-card-status"><i class="dot ' + status.dot + '"></i><span>' + status.text + '</span></div>';
+        button.addEventListener("click", () => selectDevice(device.device_id));
+        els.mainDeviceGrid.appendChild(button);
+      });
+    }
     function renderDeviceList() {
+      if (!els.deviceList) return;
       els.deviceList.innerHTML = "";
       if (!devices.length) {
         const empty = document.createElement("div");
@@ -713,25 +1039,34 @@
       }
       devices.forEach(device => {
         const snap = stateByDevice[device.device_id] || {};
-        const online = snap.online === true ? "ok" : snap.online === false ? "bad" : "wait";
+        const status = deviceStatusInfo(snap);
         const button = document.createElement("button");
         button.type = "button";
         button.className = "device-btn" + (device.device_id === selectedId ? " active" : "");
         button.innerHTML =
-          '<div class="device-name"><span>' + escapeHtml(device.name || device.device_id) + '</span><i class="dot ' + online + '"></i></div>' +
-          '<div class="device-meta">' + escapeHtml(device.device_id) + '</div>';
-        button.addEventListener("click", () => {
-          selectedId = device.device_id;
-          saveDevices();
-          subscribeAll();
-          render();
-        });
+          '<div class="device-list-row"><div class="device-thumb"><svg class="icon sm"><use href="#icon-sensor"></use></svg></div>' +
+          '<div class="device-list-main"><div class="device-name"><span>' + escapeHtml(device.name || device.device_id) + '</span><i class="dot ' + status.dot + '"></i></div>' +
+          '<div class="device-meta">' + status.text + '</div></div></div>';
+        button.addEventListener("click", () => selectDevice(device.device_id));
         els.deviceList.appendChild(button);
       });
     }
     function render() {
       const device = selectedDevice();
-      renderDeviceList();
+      renderMainDeviceGrid();
+      if (!device && activeView === "detail") activeView = "devices";
+      els.mainHeader.hidden = activeView !== "detail";
+      els.connectionView.hidden = activeView !== "connection";
+      els.deviceListView.hidden = activeView !== "devices";
+      els.addDeviceView.hidden = activeView !== "add";
+      els.deviceDetailView.hidden = activeView !== "detail" || !device;
+      els.backToListBtn.hidden = activeView !== "detail";
+      els.resubBtn.hidden = activeView !== "detail";
+      els.removeDeviceBtn.hidden = activeView !== "detail";
+      const navView = activeView === "detail" ? "devices" : activeView;
+      document.querySelectorAll("[data-view]").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.view === navView);
+      });
       if (!device) {
         els.deviceText.textContent = T.noDevice;
         els.lastSeenText.textContent = "\u6700\u8fd1\u6d88\u606f --";
@@ -742,8 +1077,7 @@
         return;
       }
       const snap = stateByDevice[device.device_id] || {};
-      els.deviceText.textContent = snap.online === true ? T.deviceOnline : snap.online === false ? T.deviceOffline : T.deviceWaiting;
-      els.lastSeenText.textContent = snap.last_seen ? T.last + fmtAge(Date.now() - snap.last_seen) : "\u6700\u8fd1\u6d88\u606f --";
+      updateSelectedDeviceStatus();
       els.selectedTopic.textContent = baseTopic(device.device_id);
       els.telemetryTopic.textContent = topic(device.device_id, "/telemetry");
       updateTopics(device.device_id);
@@ -776,6 +1110,17 @@
       els.weatherMeta.textContent = data.weather_temp ? data.weather_temp + " C / " + (data.weather_humidity || "--") + " %" : "--";
       els.cityValue.textContent = data.city || "--";
       els.weatherTime.textContent = data.weather_time || "--";
+    }
+    function updateSelectedDeviceStatus() {
+      const device = selectedDevice();
+      if (!device) {
+        els.deviceText.textContent = T.noDevice;
+        els.lastSeenText.textContent = "\u6700\u8fd1\u6d88\u606f --";
+        return;
+      }
+      const snap = stateByDevice[device.device_id] || {};
+      els.deviceText.textContent = snap.online === true ? T.deviceOnline : snap.online === false ? T.deviceOffline : T.deviceWaiting;
+      els.lastSeenText.textContent = snap.last_seen ? T.last + fmtAge(Date.now() - snap.last_seen) : "\u6700\u8fd1\u6d88\u606f --";
     }
     function connectMqtt() {
       if (!window.mqtt) {
@@ -821,7 +1166,9 @@
       if (!matched) return;
       const payload = payloadBuffer.toString();
       const snap = stateByDevice[matched.device_id] || {};
+      const wasOffline = snap.online === false;
       snap.last_seen = Date.now();
+      snap.offline_logged = false;
       let data = null;
       try {
         data = JSON.parse(payload);
@@ -845,8 +1192,26 @@
       } else if (rawTopic.endsWith("/ack")) {
         log("\u6267\u884c\u56de\u6267 " + payload);
       }
+      if (wasOffline && snap.online === true) {
+        log((matched.name || matched.device_id) + " " + T.recovered);
+      }
       stateByDevice[matched.device_id] = snap;
       render();
+    }
+    function checkDeviceHeartbeat() {
+      const now = Date.now();
+      let changed = false;
+      devices.forEach(device => {
+        const snap = stateByDevice[device.device_id];
+        if (!snap || !snap.last_seen) return;
+        if (now - snap.last_seen > OFFLINE_TIMEOUT_MS && snap.online !== false) {
+          snap.online = false;
+          snap.offline_logged = true;
+          log((device.name || device.device_id) + " " + T.heartbeatOffline);
+          changed = true;
+        }
+      });
+      if (changed) render();
     }
     function publishJson(suffix, payload, label) {
       const device = selectedDevice();
@@ -875,13 +1240,15 @@
         return;
       }
       if (devices.some(d => d.device_id === deviceId)) {
-        selectedId = deviceId;
+        selectedId = "";
+        activeView = "devices";
         saveDevices();
         render();
         return;
       }
       devices.push({ name: els.deviceNameInput.value.trim() || deviceId, device_id: deviceId });
-      selectedId = deviceId;
+      selectedId = "";
+      activeView = "devices";
       els.deviceNameInput.value = "";
       els.deviceIdInput.value = "";
       saveDevices();
@@ -894,18 +1261,34 @@
       if (!device) return;
       devices = devices.filter(d => d.device_id !== device.device_id);
       delete stateByDevice[device.device_id];
-      selectedId = (devices[0] && devices[0].device_id) || "";
+      selectedId = "";
       saveDevices();
       render();
       log(T.removed + device.device_id);
     }
-
     els.connectBtn.addEventListener("click", connectMqtt);
     els.disconnectBtn.addEventListener("click", disconnectMqtt);
+    [els.deviceNameInput, els.deviceIdInput].forEach(input => {
+      input.addEventListener("keydown", evt => {
+        if (evt.key === "Enter") addDevice();
+      });
+    });
+    els.backToListBtn.addEventListener("click", showDeviceList);
+    document.querySelectorAll("[data-view]").forEach(btn => {
+      btn.addEventListener("click", () => setActiveView(btn.dataset.view));
+    });
     els.resubBtn.addEventListener("click", subscribeAll);
     els.addDeviceBtn.addEventListener("click", addDevice);
     els.removeDeviceBtn.addEventListener("click", removeDevice);
     els.clearLogBtn.addEventListener("click", () => { els.log.innerHTML = ""; });
+    els.installAppBtn.addEventListener("click", async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice.catch(() => null);
+      log(choice && choice.outcome === "accepted" ? "PWA \u5df2\u5f00\u59cb\u5b89\u88c5" : "PWA \u5b89\u88c5\u5df2\u53d6\u6d88");
+      deferredInstallPrompt = null;
+      els.installAppBtn.hidden = true;
+    });
     els.colorInput.addEventListener("input", evt => setColor(evt.target.value, false));
     els.sendColorBtn.addEventListener("click", () => publishColor(currentColor));
     els.sendCustomBtn.addEventListener("click", () => {
@@ -924,12 +1307,30 @@
     render();
     setColor(currentColor, false);
     connectMqtt();
+    setInterval(() => {
+      checkDeviceHeartbeat();
+      updateSelectedDeviceStatus();
+    }, 1000);
 
     if ("serviceWorker" in navigator && location.protocol === "https:") {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js").catch(err => log("PWA \u6ce8\u518c\u5931\u8d25 " + err.message));
+        navigator.serviceWorker.register("sw.js").then(() => log("PWA \u5df2\u51c6\u5907")).catch(err => log("PWA \u6ce8\u518c\u5931\u8d25 " + err.message));
       });
     }
+    window.addEventListener("beforeinstallprompt", evt => {
+      evt.preventDefault();
+      deferredInstallPrompt = evt;
+      els.installAppBtn.hidden = false;
+      log("PWA \u53ef\u5b89\u88c5");
+    });
+    window.addEventListener("appinstalled", () => {
+      deferredInstallPrompt = null;
+      els.installAppBtn.hidden = true;
+      log("PWA \u5df2\u5b89\u88c5");
+    });
   </script>
 </body>
 </html>
+
+
+
