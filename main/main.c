@@ -1,5 +1,6 @@
 #include "aht30_sensor.h"
 #include "app_state.h"
+#include "buttons.h"
 #include "dns_server.h"
 #include "esp_check.h"
 #include "esp_event.h"
@@ -8,6 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "i2c_bus.h"
+#include "max9814.h"
 #include "nvs_flash.h"
 #include "oled_ui.h"
 #include "rgb_led.h"
@@ -44,7 +46,7 @@ static void reduce_http_log_noise(void)
   esp_log_level_set("httpd_txrx", ESP_LOG_ERROR);
   esp_log_level_set("httpd_parse", ESP_LOG_ERROR);
 }
-// 主函数
+
 void app_main(void)
 {
   app_state_init();
@@ -67,6 +69,8 @@ void app_main(void)
   xTaskCreate(dns_server_task, "dns_server", 4096, ap_netif, 5, NULL);
   xTaskCreate(weather_task, "weather_task", 6144, NULL, 5, NULL);
   xTaskCreate(led_task, "led_task", 4096, NULL, 5, NULL);
+  xTaskCreate(buttons_task, "buttons_task", 3072, NULL, 5, NULL);
+  xTaskCreate(max9814_task, "max9814_task", 3072, NULL, 5, NULL);
 
   if (i2c_bus_init() == ESP_OK)
   {
