@@ -10,10 +10,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "rgb_led.h"
+#include "voice_control.h"
 
 static const char *TAG = "buttons";
 
 #define BUTTON_ACTIVE_LEVEL 0
+#define BUTTON_RELEASE_LEVEL 1
 #define BUTTON_POLL_MS 20
 #define BUTTON_DEBOUNCE_MS 60
 
@@ -23,6 +25,7 @@ typedef struct
   int stable_level;
   int last_level;
   TickType_t last_change_tick;
+  TickType_t press_tick;
 } button_state_t;
 
 static button_state_t s_buttons[] = {
@@ -93,7 +96,7 @@ static void cycle_effect(void)
   ESP_LOGI(TAG, "effect -> %s", s_effects[s_effect_index]);
 }
 
-static void handle_button_press(size_t index)
+static void handle_short_press(size_t index)
 {
   switch (index)
   {
@@ -108,6 +111,46 @@ static void handle_button_press(size_t index)
     break;
   default:
     break;
+  }
+}
+
+static void handle_button_pressed(size_t index, TickType_t now)
+{
+  s_buttons[index].press_tick = now;
+  if (index == 2)
+  {
+    esp_err_t ret = voice_control_start();
+    if (ret != ESP_OK)
+    {
+      ESP_LOGW(TAG, "voice start failed: %s", esp_err_to_name(ret));
+    }
+  }
+  else
+  {
+    handle_short_press(index);
+  }
+}
+
+static void handle_button_released(size_t index, TickType_t now)
+{
+  if (index != 2)
+  {
+    return;
+  }
+
+  uint32_t held_ms = pdTICKS_TO_MS(now - s_buttons[index].press_tick);
+  if (held_ms < VOICE_TRIGGER_HOLD_MS)
+  {
+    voice_control_cancel();
+    cycle_effect();
+    return;
+  }
+
+  ESP_LOGI(TAG, "voice trigger, held %lu ms", (unsigned long)held_ms);
+  esp_err_t ret = voice_control_stop_and_execute();
+  if (ret != ESP_OK)
+  {
+    ESP_LOGW(TAG, "voice control failed: %s", esp_err_to_name(ret));
   }
 }
 
@@ -146,7 +189,11 @@ void buttons_task(void *arg)
         s_buttons[i].stable_level = level;
         if (level == BUTTON_ACTIVE_LEVEL)
         {
-          handle_button_press(i);
+          handle_button_pressed(i, now);
+        }
+        else if (level == BUTTON_RELEASE_LEVEL)
+        {
+          handle_button_released(i, now);
         }
       }
     }
