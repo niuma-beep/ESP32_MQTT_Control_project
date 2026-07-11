@@ -14,8 +14,10 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "mqtt_client_app.h"
+#include "wifi_portal.h"
 
 static const char *TAG = "web_server";
+#define HTTP_JSON_BODY_MAX 512
 
 extern const char index_html_start[] asm("_binary_index_html_start");
 extern const char index_html_end[] asm("_binary_index_html_end");
@@ -78,10 +80,53 @@ static esp_err_t discard_request_body(httpd_req_t *req)
   return ESP_OK;
 }
 
+static esp_err_t read_request_body(httpd_req_t *req, char *buf, size_t buf_size)
+{
+  if (req->content_len <= 0 || req->content_len >= buf_size)
+  {
+    return ESP_ERR_INVALID_SIZE;
+  }
+
+  int remaining = req->content_len;
+  int offset = 0;
+  while (remaining > 0)
+  {
+    int recv_len = httpd_req_recv(req, buf + offset, remaining);
+    if (recv_len <= 0)
+    {
+      return ESP_FAIL;
+    }
+    offset += recv_len;
+    remaining -= recv_len;
+  }
+  buf[offset] = '\0';
+  return ESP_OK;
+}
+
+static esp_err_t send_cjson(httpd_req_t *req, cJSON *root)
+{
+  char *json = root ? cJSON_PrintUnformatted(root) : NULL;
+  if (!json)
+  {
+    cJSON_Delete(root);
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                        "JSON build failed");
+    return ESP_FAIL;
+  }
+
+  httpd_resp_set_type(req, "application/json; charset=utf-8");
+  httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+  cJSON_free(json);
+  cJSON_Delete(root);
+  return ESP_OK;
+}
+
 static cJSON *create_data_json(void)
 {
   app_data_t snap;
   app_data_snapshot(&snap);
+  char sta_ssid[33];
+  wifi_portal_get_sta_ssid(sta_ssid, sizeof(sta_ssid));
 
   int64_t now_us = esp_timer_get_time();
   int64_t sensor_age_ms = (now_us - snap.sensor_update_us) / 1000;
@@ -112,6 +157,7 @@ static cJSON *create_data_json(void)
   cJSON_AddNumberToObject(root, "weather_seq", snap.weather_seq);
   cJSON_AddNumberToObject(root, "wifi_age", (double)wifi_age_ms);
   cJSON_AddBoolToObject(root, "sta_connected", snap.sta_connected);
+  cJSON_AddStringToObject(root, "sta_ssid", sta_ssid);
   cJSON_AddStringToObject(root, "sta_ip", snap.sta_ip);
   cJSON_AddNumberToObject(root, "wifi_rssi", snap.wifi_rssi);
   cJSON_AddStringToObject(root, "city", snap.city);
@@ -129,21 +175,7 @@ static cJSON *create_data_json(void)
 
 static esp_err_t send_data_json(httpd_req_t *req)
 {
-  cJSON *root = create_data_json();
-  char *json = root ? cJSON_PrintUnformatted(root) : NULL;
-  if (!json)
-  {
-    cJSON_Delete(root);
-    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
-                        "JSON build failed");
-    return ESP_FAIL;
-  }
-
-  httpd_resp_set_type(req, "application/json; charset=utf-8");
-  httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
-  cJSON_free(json);
-  cJSON_Delete(root);
-  return ESP_OK;
+  return send_cjson(req, create_data_json());
 }
 
 static esp_err_t root_get_handler(httpd_req_t *req)
@@ -185,6 +217,76 @@ static esp_err_t api_data_get_handler(httpd_req_t *req)
   return ESP_OK;
 }
 
+static esp_err_t api_wifi_scan_handler(httpd_req_t *req)
+{
+  request_url_t url;
+  parse_request_url(req->uri, &url);
+  log_request_url(req, &url);
+
+  if (discard_request_body(req) != ESP_OK)
+  {
+    httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request body");
+    return ESP_FAIL;
+  }
+
+  esp_err_t scan_err = ESP_OK;
+  cJSON *root = wifi_portal_create_scan_json(&scan_err);
+  if (!root)
+  {
+    char msg[64];
+    snprintf(msg, sizeof(msg), "WiFi scan failed: %s",
+             esp_err_to_name(scan_err));
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, msg);
+    return ESP_FAIL;
+  }
+
+  return send_cjson(req, root);
+}
+
+static esp_err_t api_wifi_connect_handler(httpd_req_t *req)
+{
+  request_url_t url;
+  parse_request_url(req->uri, &url);
+  log_request_url(req, &url);
+
+  char body[HTTP_JSON_BODY_MAX];
+  if (read_request_body(req, body, sizeof(body)) != ESP_OK)
+  {
+    httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request body");
+    return ESP_FAIL;
+  }
+
+  cJSON *root = cJSON_Parse(body);
+  const cJSON *ssid = root ? cJSON_GetObjectItemCaseSensitive(root, "ssid") : NULL;
+  const cJSON *password = root ? cJSON_GetObjectItemCaseSensitive(root, "password") : NULL;
+  if (!cJSON_IsString(ssid) ||
+      (password && !cJSON_IsString(password) && !cJSON_IsNull(password)))
+  {
+    cJSON_Delete(root);
+    httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid WiFi config");
+    return ESP_FAIL;
+  }
+
+  esp_err_t err = wifi_portal_connect_sta(ssid->valuestring,
+                                          cJSON_IsString(password)
+                                              ? password->valuestring
+                                              : "");
+  cJSON_Delete(root);
+  if (err != ESP_OK)
+  {
+    char msg[64];
+    snprintf(msg, sizeof(msg), "WiFi connect failed: %s",
+             esp_err_to_name(err));
+    httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, msg);
+    return ESP_FAIL;
+  }
+
+  cJSON *resp = cJSON_CreateObject();
+  cJSON_AddBoolToObject(resp, "ok", true);
+  cJSON_AddStringToObject(resp, "message", "WiFi config saved, connecting");
+  return send_cjson(req, resp);
+}
+
 static esp_err_t http_404_handler(httpd_req_t *req, httpd_err_code_t err)
 {
   (void)err;
@@ -223,10 +325,22 @@ void start_webserver(void)
       .method = HTTP_GET,
       .handler = api_data_get_handler,
   };
+  httpd_uri_t wifi_scan = {
+      .uri = "/api/wifi/scan",
+      .method = HTTP_POST,
+      .handler = api_wifi_scan_handler,
+  };
+  httpd_uri_t wifi_connect = {
+      .uri = "/api/wifi/connect",
+      .method = HTTP_POST,
+      .handler = api_wifi_connect_handler,
+  };
 
   ESP_ERROR_CHECK(httpd_register_uri_handler(server, &root));
   ESP_ERROR_CHECK(httpd_register_uri_handler(server, &api_post));
   ESP_ERROR_CHECK(httpd_register_uri_handler(server, &api_get));
+  ESP_ERROR_CHECK(httpd_register_uri_handler(server, &wifi_scan));
+  ESP_ERROR_CHECK(httpd_register_uri_handler(server, &wifi_connect));
   ESP_ERROR_CHECK(httpd_register_err_handler(server, HTTPD_404_NOT_FOUND,
                                              http_404_handler));
 }

@@ -1,10 +1,12 @@
-const CACHE_NAME = "esp32-remote-console-v1";
+const CACHE_NAME = "esp32-remote-console-v6";
 const APP_SHELL = [
   "./",
   "index.html",
   "monitor.html",
   "manifest.webmanifest",
-  "icon.svg"
+  "icon.svg",
+  "icon-192.png",
+  "icon-512.png"
 ];
 
 self.addEventListener("install", event => {
@@ -25,6 +27,12 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match("./").then(cached => cached || caches.match("index.html")))
+    );
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
@@ -38,3 +46,4 @@ self.addEventListener("fetch", event => {
     })
   );
 });
+

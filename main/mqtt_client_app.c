@@ -37,7 +37,17 @@ static char s_mqtt_telemetry_topic[MQTT_TOPIC_LEN];
 static char s_mqtt_cmd_topic[MQTT_TOPIC_LEN];
 static char s_mqtt_rgb_cmd_topic[MQTT_TOPIC_LEN];
 static char s_mqtt_rgb_state_topic[MQTT_TOPIC_LEN];
+static char s_mqtt_clock_cmd_topic[MQTT_TOPIC_LEN];
+static char s_mqtt_clock_state_topic[MQTT_TOPIC_LEN];
+static char s_mqtt_waterfall_cmd_topic[MQTT_TOPIC_LEN];
+static char s_mqtt_features_cmd_topic[MQTT_TOPIC_LEN];
+static char s_mqtt_features_state_topic[MQTT_TOPIC_LEN];
 static char s_mqtt_lwt_msg[MQTT_LWT_MSG_LEN];
+
+static char s_clock_mode[16] = "time";
+static char s_clock_effect[16] = "normal";
+static char s_clock_text[64] = "";
+static uint8_t s_clock_brightness = CLOCK_LED_DEFAULT_BRIGHTNESS;
 
 static void mqtt_identity_init(void)
 {
@@ -63,14 +73,29 @@ static void mqtt_identity_init(void)
   // 生成MQTT状态主题、遥测主题、命令主题和RGB灯状态主题
   snprintf(s_mqtt_status_topic, sizeof(s_mqtt_status_topic), "%s/status",
            s_mqtt_base_topic);
+  // 生成遥测主题
   snprintf(s_mqtt_telemetry_topic, sizeof(s_mqtt_telemetry_topic),
            "%s/telemetry", s_mqtt_base_topic);
+  // 生成命令主题字符串
   snprintf(s_mqtt_cmd_topic, sizeof(s_mqtt_cmd_topic), "%s/cmd/#",
            s_mqtt_base_topic);
+  // 生成RGB命令主题字符串,用于控制RGB灯
   snprintf(s_mqtt_rgb_cmd_topic, sizeof(s_mqtt_rgb_cmd_topic), "%s/cmd/rgb",
            s_mqtt_base_topic);
+  // 生成RGB状态主题字符串,用于标识RGB字灯状态
   snprintf(s_mqtt_rgb_state_topic, sizeof(s_mqtt_rgb_state_topic),
            "%s/state/rgb", s_mqtt_base_topic);
+  // 生成时钟命令主题字符串
+  snprintf(s_mqtt_clock_cmd_topic, sizeof(s_mqtt_clock_cmd_topic),
+           "%s/cmd/clock", s_mqtt_base_topic);
+  snprintf(s_mqtt_clock_state_topic, sizeof(s_mqtt_clock_state_topic),
+           "%s/state/clock", s_mqtt_base_topic);
+  snprintf(s_mqtt_waterfall_cmd_topic, sizeof(s_mqtt_waterfall_cmd_topic),
+           "%s/cmd/waterfall", s_mqtt_base_topic);
+  snprintf(s_mqtt_features_cmd_topic, sizeof(s_mqtt_features_cmd_topic),
+           "%s/cmd/query_features", s_mqtt_base_topic);
+  snprintf(s_mqtt_features_state_topic, sizeof(s_mqtt_features_state_topic),
+           "%s/state/features", s_mqtt_base_topic);
   // 生成遗嘱消息，表示设备离线时的状态
   snprintf(s_mqtt_lwt_msg, sizeof(s_mqtt_lwt_msg),
            "{\"device\":\"%s\",\"online\":false}", s_mqtt_device_id);
@@ -90,6 +115,13 @@ static uint8_t clamp_color_value(double value)
     return 255;
   }
   return (uint8_t)value;
+}
+
+static uint8_t clamp_clock_brightness(double value)
+{
+  uint8_t brightness = clamp_color_value(value);
+  return brightness > CLOCK_LED_MAX_BRIGHTNESS ? CLOCK_LED_MAX_BRIGHTNESS
+                                               : brightness;
 }
 
 static bool parse_hex_digit(char ch, uint8_t *value)
@@ -228,9 +260,15 @@ static char *build_telemetry_json(void)
   uint8_t red;
   uint8_t green;
   uint8_t blue;
+  uint8_t clock_red;
+  uint8_t clock_green;
+  uint8_t clock_blue;
+  uint8_t clock_brightness;
 
   app_data_snapshot(&snap);
   rgb_led_get_color(&red, &green, &blue);
+  clock_led_get_color(&clock_red, &clock_green, &clock_blue);
+  clock_brightness = clock_led_get_brightness();
 
   int64_t now_us = esp_timer_get_time();
   int64_t sensor_age_ms = (now_us - snap.sensor_update_us) / 1000;
@@ -270,6 +308,28 @@ static char *build_telemetry_json(void)
   cJSON_AddNumberToObject(root, "rgb_r", red);
   cJSON_AddNumberToObject(root, "rgb_g", green);
   cJSON_AddNumberToObject(root, "rgb_b", blue);
+  cJSON *rgb = cJSON_AddObjectToObject(root, "rgb");
+  if (rgb)
+  {
+    cJSON_AddNumberToObject(rgb, "r", red);
+    cJSON_AddNumberToObject(rgb, "g", green);
+    cJSON_AddNumberToObject(rgb, "b", blue);
+  }
+  cJSON_AddBoolToObject(root, "has_rgb", true);
+  cJSON_AddBoolToObject(root, "has_clock", true);
+  cJSON_AddNumberToObject(root, "led_width", CLOCK_LED_MATRIX_WIDTH);
+  cJSON_AddNumberToObject(root, "led_height", CLOCK_LED_MATRIX_HEIGHT);
+  cJSON_AddNumberToObject(root, "led_count", CLOCK_LED_NUMBERS);
+  cJSON_AddNumberToObject(root, "clock_panel_count", CLOCK_LED_PANEL_COUNT);
+  cJSON_AddNumberToObject(root, "clock_max_brightness",
+                          CLOCK_LED_MAX_BRIGHTNESS);
+  cJSON_AddStringToObject(root, "clock_mode", s_clock_mode);
+  cJSON_AddStringToObject(root, "clock_effect", s_clock_effect);
+  cJSON_AddNumberToObject(root, "clock_brightness", clock_brightness);
+  cJSON_AddStringToObject(root, "clock_text", s_clock_text);
+  cJSON_AddNumberToObject(root, "clock_color_r", clock_red);
+  cJSON_AddNumberToObject(root, "clock_color_g", clock_green);
+  cJSON_AddNumberToObject(root, "clock_color_b", clock_blue);
 
   char *json = cJSON_PrintUnformatted(root);
   cJSON_Delete(root);
@@ -339,6 +399,66 @@ static char *build_rgb_json(void)
  *
  * @param online
  */
+static char *build_features_json(void)
+{
+  cJSON *root = cJSON_CreateObject();
+  if (!root)
+  {
+    return NULL;
+  }
+
+  cJSON_AddStringToObject(root, "device", s_mqtt_device_id);
+  cJSON_AddBoolToObject(root, "has_rgb", true);
+  cJSON_AddBoolToObject(root, "has_clock", true);
+  cJSON_AddNumberToObject(root, "rgb_gpio", RGB_LED_GPIO);
+  cJSON_AddNumberToObject(root, "clock_gpio", CLOCK_LED_GPIO);
+  cJSON_AddNumberToObject(root, "led_width", CLOCK_LED_MATRIX_WIDTH);
+  cJSON_AddNumberToObject(root, "led_height", CLOCK_LED_MATRIX_HEIGHT);
+  cJSON_AddNumberToObject(root, "led_count", CLOCK_LED_NUMBERS);
+  cJSON_AddNumberToObject(root, "clock_panel_count", CLOCK_LED_PANEL_COUNT);
+  cJSON_AddNumberToObject(root, "clock_max_brightness",
+                          CLOCK_LED_MAX_BRIGHTNESS);
+
+  char *json = cJSON_PrintUnformatted(root);
+  cJSON_Delete(root);
+  return json;
+}
+
+static char *build_clock_json(void)
+{
+  uint8_t clock_red;
+  uint8_t clock_green;
+  uint8_t clock_blue;
+  uint8_t clock_brightness;
+
+  clock_led_get_color(&clock_red, &clock_green, &clock_blue);
+  clock_brightness = clock_led_get_brightness();
+
+  cJSON *root = cJSON_CreateObject();
+  if (!root)
+  {
+    return NULL;
+  }
+
+  cJSON_AddStringToObject(root, "device", s_mqtt_device_id);
+  cJSON_AddStringToObject(root, "mode", s_clock_mode);
+  cJSON_AddStringToObject(root, "effect", s_clock_effect);
+  cJSON_AddNumberToObject(root, "brightness", clock_brightness);
+  cJSON_AddStringToObject(root, "text", s_clock_text);
+  cJSON_AddNumberToObject(root, "color_r", clock_red);
+  cJSON_AddNumberToObject(root, "color_g", clock_green);
+  cJSON_AddNumberToObject(root, "color_b", clock_blue);
+  cJSON_AddNumberToObject(root, "led_width", CLOCK_LED_MATRIX_WIDTH);
+  cJSON_AddNumberToObject(root, "led_height", CLOCK_LED_MATRIX_HEIGHT);
+  cJSON_AddNumberToObject(root, "led_count", CLOCK_LED_NUMBERS);
+  cJSON_AddNumberToObject(root, "clock_panel_count", CLOCK_LED_PANEL_COUNT);
+  cJSON_AddNumberToObject(root, "max_brightness", CLOCK_LED_MAX_BRIGHTNESS);
+
+  char *json = cJSON_PrintUnformatted(root);
+  cJSON_Delete(root);
+  return json;
+}
+
 static void publish_status(bool online)
 {
   if (!s_mqtt_client || !s_mqtt_connected)
@@ -379,6 +499,40 @@ static void publish_rgb_state(void)
  * @brief 发布传感器数据和设备状态
  *
  */
+static void publish_features_state(void)
+{
+  if (!s_mqtt_client || !s_mqtt_connected)
+  {
+    return;
+  }
+
+  char *json = build_features_json();
+  if (!json)
+  {
+    return;
+  }
+
+  mqtt_send_json(s_mqtt_features_state_topic, json, 1, 1, false);
+  cJSON_free(json);
+}
+
+static void publish_clock_state(void)
+{
+  if (!s_mqtt_client || !s_mqtt_connected)
+  {
+    return;
+  }
+
+  char *json = build_clock_json();
+  if (!json)
+  {
+    return;
+  }
+
+  mqtt_send_json(s_mqtt_clock_state_topic, json, 1, 1, false);
+  cJSON_free(json);
+}
+
 static void publish_telemetry(void)
 {
   if (!s_mqtt_client || !s_mqtt_connected)
@@ -393,16 +547,16 @@ static void publish_telemetry(void)
     return;
   }
 
-  int msg_id = esp_mqtt_client_enqueue(s_mqtt_client, s_mqtt_telemetry_topic,
-                                       json, 0, 1, 0, false);
+  int msg_id = esp_mqtt_client_publish(s_mqtt_client, s_mqtt_telemetry_topic,
+                                       json, 0, 0, 0);
   if (msg_id < 0)
   {
-    ESP_LOGW(TAG, "telemetry enqueue failed msg_id=%d outbox=%d", msg_id,
+    ESP_LOGW(TAG, "telemetry publish failed msg_id=%d outbox=%d", msg_id,
              esp_mqtt_client_get_outbox_size(s_mqtt_client));
   }
   else
   {
-    ESP_LOGI(TAG, "queued telemetry msg_id=%d", msg_id);
+    ESP_LOGI(TAG, "published telemetry msg_id=%d", msg_id);
   }
 
   cJSON_free(json);
@@ -427,6 +581,7 @@ static bool handle_rgb_command_payload(const char *payload)
   uint8_t green;
   uint8_t blue;
   bool have_color = false;
+  bool sync_clock_color = false;
 
   rgb_led_get_color(&red, &green, &blue);
 
@@ -455,6 +610,13 @@ static bool handle_rgb_command_payload(const char *payload)
       blue = 64;
       have_color = true;
     }
+  }
+
+  const cJSON *effect = cJSON_GetObjectItemCaseSensitive(root, "effect");
+  if (cJSON_IsString(effect) && effect->valuestring)
+  {
+    sync_clock_color = strcasecmp(effect->valuestring, "rainbow") == 0 ||
+                       strcasecmp(effect->valuestring, "colorful") == 0;
   }
 
   const cJSON *color = cJSON_GetObjectItemCaseSensitive(root, "color");
@@ -494,8 +656,16 @@ static bool handle_rgb_command_payload(const char *payload)
   }
 
   rgb_led_set_color(red, green, blue);
+  if (sync_clock_color)
+  {
+    clock_led_set_color(red, green, blue);
+  }
   ESP_LOGI(TAG, "RGB command applied r=%u g=%u b=%u", red, green, blue);
   publish_rgb_state();
+  if (sync_clock_color)
+  {
+    publish_clock_state();
+  }
   publish_telemetry();
   return true;
 }
@@ -504,6 +674,132 @@ static bool handle_rgb_command_payload(const char *payload)
  *
  * @param event
  */
+static bool handle_clock_command_payload(const char *payload)
+{
+  uint8_t clock_red;
+  uint8_t clock_green;
+  uint8_t clock_blue;
+
+  clock_led_get_color(&clock_red, &clock_green, &clock_blue);
+
+  cJSON *root = cJSON_Parse(payload);
+  if (!root)
+  {
+    ESP_LOGW(TAG, "invalid clock JSON: %s", payload);
+    return false;
+  }
+
+  const cJSON *mode = cJSON_GetObjectItemCaseSensitive(root, "mode");
+  if (cJSON_IsString(mode) && mode->valuestring && mode->valuestring[0])
+  {
+    strlcpy(s_clock_mode, mode->valuestring, sizeof(s_clock_mode));
+  }
+
+  const cJSON *effect = cJSON_GetObjectItemCaseSensitive(root, "effect");
+  if (cJSON_IsString(effect) && effect->valuestring && effect->valuestring[0])
+  {
+    strlcpy(s_clock_effect, effect->valuestring, sizeof(s_clock_effect));
+  }
+
+  const cJSON *brightness =
+      cJSON_GetObjectItemCaseSensitive(root, "brightness");
+  if (cJSON_IsNumber(brightness))
+  {
+    s_clock_brightness = clamp_clock_brightness(brightness->valuedouble);
+  }
+
+  const cJSON *color = cJSON_GetObjectItemCaseSensitive(root, "color");
+  if (cJSON_IsString(color) && color->valuestring)
+  {
+    parse_hex_color(color->valuestring, &clock_red, &clock_green, &clock_blue);
+  }
+
+  uint8_t new_red = clock_red;
+  uint8_t new_green = clock_green;
+  uint8_t new_blue = clock_blue;
+  bool have_clock_rgb = json_get_color(root, "color_r", &new_red) |
+                        json_get_color(root, "color_g", &new_green) |
+                        json_get_color(root, "color_b", &new_blue);
+  if (have_clock_rgb)
+  {
+    clock_red = new_red;
+    clock_green = new_green;
+    clock_blue = new_blue;
+  }
+
+  const cJSON *text = cJSON_GetObjectItemCaseSensitive(root, "text");
+  if (cJSON_IsString(text) && text->valuestring)
+  {
+    strlcpy(s_clock_text, text->valuestring, sizeof(s_clock_text));
+  }
+
+  cJSON_Delete(root);
+
+  clock_led_set_color(clock_red, clock_green, clock_blue);
+  clock_led_set_brightness(s_clock_brightness);
+  clock_led_set_mode(s_clock_mode);
+  clock_led_set_effect(s_clock_effect);
+
+  ESP_LOGI(TAG,
+           "clock command applied mode=%s effect=%s brightness=%u color=%u,%u,%u text=%s",
+           s_clock_mode, s_clock_effect, s_clock_brightness, clock_red,
+           clock_green, clock_blue, s_clock_text);
+  publish_clock_state();
+  publish_telemetry();
+  return true;
+}
+
+static bool handle_waterfall_command_payload(const char *payload)
+{
+  bool enable = true;
+
+  cJSON *root = cJSON_Parse(payload);
+  if (root)
+  {
+    const cJSON *enable_item =
+        cJSON_GetObjectItemCaseSensitive(root, "enable");
+    if (cJSON_IsBool(enable_item))
+    {
+      enable = cJSON_IsTrue(enable_item);
+    }
+
+    const cJSON *state = cJSON_GetObjectItemCaseSensitive(root, "state");
+    if (cJSON_IsString(state) && state->valuestring)
+    {
+      if (strcasecmp(state->valuestring, "off") == 0)
+      {
+        enable = false;
+      }
+      else if (strcasecmp(state->valuestring, "on") == 0)
+      {
+        enable = true;
+      }
+    }
+
+    const cJSON *brightness =
+        cJSON_GetObjectItemCaseSensitive(root, "brightness");
+    if (cJSON_IsNumber(brightness))
+    {
+      s_clock_brightness = clamp_clock_brightness(brightness->valuedouble);
+      clock_led_set_brightness(s_clock_brightness);
+    }
+
+    cJSON_Delete(root);
+  }
+
+  strlcpy(s_clock_mode, enable ? "waterfall" : "time",
+          sizeof(s_clock_mode));
+  strlcpy(s_clock_effect, "normal", sizeof(s_clock_effect));
+  clock_led_set_mode(s_clock_mode);
+  clock_led_set_effect(s_clock_effect);
+
+  ESP_LOGI(TAG, "waterfall command applied enable=%d mode=%s",
+           enable, s_clock_mode);
+  publish_clock_state();
+  publish_telemetry();
+  return true;
+}
+
 static void handle_command(const esp_mqtt_event_handle_t event)
 {
   char topic[96] = {0};
@@ -529,6 +825,18 @@ static void handle_command(const esp_mqtt_event_handle_t event)
   {
     handle_rgb_command_payload(payload);
   }
+  else if (topic_equals(event, s_mqtt_clock_cmd_topic))
+  {
+    handle_clock_command_payload(payload);
+  }
+  else if (topic_equals(event, s_mqtt_waterfall_cmd_topic))
+  {
+    handle_waterfall_command_payload(payload);
+  }
+  else if (topic_equals(event, s_mqtt_features_cmd_topic))
+  {
+    publish_features_state();
+  }
 }
 /**
  * @brief MQTT事件处理函数
@@ -552,6 +860,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     ESP_LOGI(TAG, "connected to %s", MQTT_BROKER_URI);
     publish_status(true);
     publish_rgb_state();
+    publish_features_state();
+    publish_clock_state();
     esp_mqtt_client_subscribe(s_mqtt_client, s_mqtt_cmd_topic, 1);
     publish_telemetry();
     break;
@@ -636,7 +946,7 @@ void mqtt_client_app_start(void)
   esp_mqtt_client_config_t mqtt_cfg = {
       .broker.address.uri = MQTT_BROKER_URI,
       .credentials.client_id = s_mqtt_device_id,
-      .session.keepalive = 60,
+      .session.keepalive = 30,
       .session.protocol_ver = MQTT_PROTOCOL_V_3_1_1,
       // 初始化遗嘱消息
       .session.last_will.topic = s_mqtt_status_topic,
@@ -644,7 +954,7 @@ void mqtt_client_app_start(void)
       .session.last_will.qos = 1,
       .session.last_will.retain = 1,
       // 设置重连时间和超时时间
-      .network.reconnect_timeout_ms = 3000,
+      .network.reconnect_timeout_ms = 10000,
       .network.timeout_ms = 20000,
       .task.stack_size = 6144,
   };
