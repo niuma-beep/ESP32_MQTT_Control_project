@@ -3,8 +3,12 @@ idf_component_register(
         "main.c"
         "app_state.c"
         "app_time.c"
+        "ai_client.c"
+        "buttons.c"
+        "voice_control.c"
         "i2c_bus.c"
         "rgb_led.c"
+        "max9814.c"
         "aht30_sensor.c"
         "oled_ui.c"
         "weather_client.c"
@@ -16,7 +20,9 @@ idf_component_register(
     EMBED_TXTFILES "index.html"
     PRIV_REQUIRES
         esp_driver_rmt
+        esp_driver_gpio
         esp_driver_i2c
+        esp_adc
         esp_lcd
         esp_wifi
         esp_event

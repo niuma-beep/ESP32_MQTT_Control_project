@@ -44,7 +44,7 @@ static void reduce_http_log_noise(void)
   esp_log_level_set("httpd_txrx", ESP_LOG_ERROR);
   esp_log_level_set("httpd_parse", ESP_LOG_ERROR);
 }
-// 主函数
+
 void app_main(void)
 {
   app_state_init();
